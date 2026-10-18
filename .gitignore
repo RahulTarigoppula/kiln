@@ -1,0 +1,7 @@
+node_modules/
+web/dist/
+dist/
+.DS_Store
+coverage/
+.vite/
+checkpoints/*.tmp
