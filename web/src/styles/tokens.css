@@ -1,0 +1,84 @@
+/* Kiln design tokens — "the firing room" */
+:root {
+  color-scheme: dark;
+
+  /* surfaces */
+  --bg: #0e0d0b;
+  --bg-1: #141311;
+  --bg-2: #1a1917;
+  --bg-3: #221f1b;
+  --bg-4: #2a2622;
+
+  /* hairlines */
+  --line: rgba(255, 244, 230, 0.08);
+  --line-strong: rgba(255, 244, 230, 0.16);
+
+  /* ash greys (text) */
+  --ash-0: #f4efe7;
+  --ash-1: #e6e0d6;
+  --ash-2: #b3ada3;
+  --ash-3: #7f7a71;
+  --ash-4: #504c45;
+  --ash-5: #35322d;
+
+  /* ember accent */
+  --ember: #ff7a1a;
+  --ember-bright: #ffa24f;
+  --ember-deep: #c9560a;
+  --ember-dim: rgba(255, 122, 26, 0.16);
+  --ember-glow: rgba(255, 122, 26, 0.55);
+  --ember-text: #ffb27a;
+
+  /* semantic */
+  --ok: #7fd48a;
+  --ok-dim: rgba(127, 212, 138, 0.14);
+  --warn: #f2c35a;
+  --warn-dim: rgba(242, 195, 90, 0.14);
+  --bad: #ff6464;
+  --bad-dim: rgba(255, 100, 100, 0.14);
+  --cool: #8db7e6;
+  --cool-dim: rgba(141, 183, 230, 0.16);
+
+  /* type */
+  --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.5rem;
+  --fs-2xl: 2rem;
+  --fs-3xl: 2.75rem;
+
+  /* spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  /* shape */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* elevation */
+  --shadow-card: 0 1px 0 rgba(255, 244, 230, 0.03) inset, 0 18px 40px -24px rgba(0, 0, 0, 0.8);
+  --shadow-pop: 0 10px 30px -10px rgba(0, 0, 0, 0.9), 0 0 0 1px var(--line-strong);
+
+  /* motion */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --t-fast: 120ms;
+  --t-med: 220ms;
+
+  /* layout */
+  --content-max: 1280px;
+  --gutter: clamp(16px, 4vw, 40px);
+  --nav-h: 60px;
+}
