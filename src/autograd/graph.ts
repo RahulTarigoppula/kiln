@@ -1,8 +1,14 @@
 /**
  * Autograd graph: grad-mode flag, `Node` (a recorded backward function) and the reverse-mode engine.
+ *
+ * Memory: `backward()` frees what it can as it goes — each node's owned `saved` tensors (via `release()`),
+ * temporaries created inside backward closures (an internal scope per node), and the gradients of non-leaf
+ * tensors once they have been propagated. Gradients stored on leaves are `escape`d from any enclosing
+ * `tidy` scope: the leaf owns them (`zeroGrad()` frees them, accumulation frees the replaced grad).
  */
 import { Tensor, type GradFn } from "../tensor/tensor";
 import { shapesEqual } from "../tensor/shape";
+import { beginScope, endScope, escape } from "../tensor/scope";
 import { add, cloneRaw, contiguousRaw } from "./ops";
 
 let gradEnabled = true;
@@ -46,8 +52,9 @@ export type BackwardFn = (gradOut: Tensor) => (Tensor | null)[];
 export class Node implements GradFn {
   readonly name: string;
   readonly inputs: readonly Tensor[];
-  /** Tensors kept alive for backward; cleared by `release()`. */
+  /** Fresh tensors the op created for backward; owned by the node and freed by `release()`. */
   saved: Tensor[];
+  released = false;
   private fn: BackwardFn | null;
 
   constructor(name: string, inputs: readonly Tensor[], fn: BackwardFn, saved: Tensor[] = []) {
@@ -64,9 +71,11 @@ export class Node implements GradFn {
     return this.fn(gradOut);
   }
 
-  /** Drop saved tensors and the backward closure so their buffers can be reclaimed. */
+  /** Free the owned saved tensors and drop the backward closure so buffers can be reclaimed. */
   release(): void {
     this.fn = null;
+    this.released = true;
+    for (const s of this.saved) s.free();
     this.saved = [];
   }
 }
@@ -78,9 +87,15 @@ export function needsGrad(inputs: readonly Tensor[]): boolean {
   return false;
 }
 
-/** Attach a backward node to `out` if recording is needed; returns `out`. */
+/**
+ * Attach a backward node to `out` if recording is needed; returns `out`. `saved` lists *fresh* tensors the op
+ * made for backward (never its inputs or output): they are freed when the node is released.
+ */
 export function record(out: Tensor, name: string, inputs: readonly Tensor[], fn: BackwardFn, saved: Tensor[] = []): Tensor {
-  if (!needsGrad(inputs)) return out;
+  if (!needsGrad(inputs)) {
+    for (const s of saved) s.free();
+    return out;
+  }
   out.gradFn = new Node(name, inputs, fn, saved);
   out.requiresGrad = true;
   return out;
@@ -114,9 +129,24 @@ export function topologicalOrder(root: Tensor): Tensor[] {
   return order;
 }
 
+/** Store `g` as `t.grad` (accumulating), taking ownership: the stored tensor is escaped from scopes. */
+function storeGrad(t: Tensor, g: Tensor, claimed: Set<Tensor>): void {
+  let own = g;
+  if (claimed.has(g) || !g.isDense) own = g.isDense ? cloneRaw(g) : contiguousRaw(g);
+  claimed.add(own);
+  if (t.grad) {
+    const sum = add(t.grad, own);
+    t.grad.free();
+    t.grad = escape(sum);
+  } else {
+    t.grad = escape(own);
+  }
+}
+
 /**
  * Reverse-mode backward from `root`. Gradients are accumulated into leaf tensors' `.grad`
- * (and into non-leaves that called `retainGrad()`); saved tensors are released as nodes are consumed.
+ * (and into non-leaves that called `retainGrad()`); saved tensors and intermediate grads are freed as nodes
+ * are consumed.
  */
 export function backward(root: Tensor, grad?: Tensor): void {
   if (!root.requiresGrad) throw new Error("backward() called on a tensor that does not require grad");
@@ -133,16 +163,23 @@ export function backward(root: Tensor, grad?: Tensor): void {
   noGrad(() => {
     const order = topologicalOrder(root);
     const grads = new Map<Tensor, Tensor>();
+    /** Tensors that must not be freed by the engine: the caller's grad and everything stored as `.grad`. */
     const claimed = new Set<Tensor>();
+    /** How many `grads` entries reference each gradient tensor object (backward fns may alias outputs). */
+    const refs = new Map<Tensor, number>();
+    const incr = (t: Tensor): void => { refs.set(t, (refs.get(t) ?? 0) + 1); };
+    const decr = (t: Tensor): void => {
+      const n = (refs.get(t) ?? 0) - 1;
+      if (n > 0) {
+        refs.set(t, n);
+        return;
+      }
+      refs.delete(t);
+      if (!claimed.has(t)) t.free();
+    };
     if (grad) claimed.add(grad);
     grads.set(root, g0);
-
-    const store = (t: Tensor, g: Tensor): void => {
-      let own = g;
-      if (claimed.has(g) || !g.isDense) own = g.isDense ? cloneRaw(g) : contiguousRaw(g);
-      claimed.add(own);
-      t.grad = t.grad ? add(t.grad, own) : own;
-    };
+    incr(g0);
 
     for (let i = order.length - 1; i >= 0; i--) {
       const t = order[i] as Tensor;
@@ -150,7 +187,17 @@ export function backward(root: Tensor, grad?: Tensor): void {
       if (!g) continue;
       const fn = t.gradFn;
       if (fn) {
-        const inGrads = fn.backward(g);
+        // Temporaries created by the closure (dense copies, products, …) die with this scope; returned
+        // gradients survive because they are the scope's result.
+        beginScope();
+        let inGrads: (Tensor | null)[];
+        try {
+          inGrads = fn.backward(g);
+        } catch (e) {
+          endScope(undefined);
+          throw e;
+        }
+        endScope(inGrads);
         const inputs = fn.inputs;
         if (inGrads.length !== inputs.length) {
           throw new Error(`Node ${fn.name} returned ${inGrads.length} gradients for ${inputs.length} inputs`);
@@ -162,15 +209,30 @@ export function backward(root: Tensor, grad?: Tensor): void {
           if (!shapesEqual(ig.shape, inp.shape)) {
             throw new Error(`Node ${fn.name}: gradient shape [${ig.shape.join(",")}] != input shape [${inp.shape.join(",")}]`);
           }
+          incr(ig);
+        }
+        for (let k = 0; k < inputs.length; k++) {
+          const inp = inputs[k] as Tensor;
+          const ig = inGrads[k];
+          if (!ig || !inp.requiresGrad) continue;
           const prev = grads.get(inp);
-          grads.set(inp, prev ? add(prev, ig) : ig);
+          if (prev) {
+            const sum = add(prev, ig);
+            grads.set(inp, sum);
+            incr(sum);
+            decr(prev);
+            decr(ig);
+          } else {
+            grads.set(inp, ig);
+          }
         }
         fn.release();
-        if (t.retainsGrad) store(t, g);
+        if (t.retainsGrad) storeGrad(t, g, claimed);
       } else {
-        store(t, g);
+        storeGrad(t, g, claimed);
       }
       grads.delete(t);
+      decr(g);
     }
   });
 }

@@ -4,4 +4,5 @@ export * from "./shape";
 export * from "./random";
 export * from "./device";
 export * from "./storage";
+export * from "./scope";
 export * from "./tensor";

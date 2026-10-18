@@ -16,6 +16,7 @@ import {
   shapesEqual, sizeOf, sliceStridesOffset, type Shape,
 } from "../tensor/shape";
 import { Tensor } from "../tensor/tensor";
+import { escape } from "../tensor/scope";
 import { isGradEnabled, record } from "./graph";
 
 // ============================================================================ helpers
@@ -47,6 +48,13 @@ export function cloneRaw(t: Tensor): Tensor {
 }
 
 const dense = contiguousRaw;
+
+/** The tensors among `derived` that are fresh copies (not one of `originals`) — owned by a backward node. */
+function fresh(derived: readonly Tensor[], originals: readonly Tensor[]): Tensor[] {
+  const out: Tensor[] = [];
+  for (const d of derived) if (!originals.includes(d) && !out.includes(d)) out.push(d);
+  return out;
+}
 
 function assertDevice(a: Tensor, b: Tensor, op: string): void {
   if (a.device !== b.device) throw new Error(`${op}: tensors are on different devices (${a.device} vs ${b.device})`);
@@ -772,7 +780,7 @@ export function embedding(table: Tensor, ids: Tensor): Tensor {
     const gt = Tensor.zeros([V, C], { device: table.device });
     if (n > 0) table.backend.scatterAdd(dense(g).buf, idd.buf, n, C, gt.buf);
     return [gt];
-  });
+  }, fresh([idd], [ids]));
 }
 
 /** Select rows along `dim` by an i32 index tensor (any shape; result replaces `dim` with ids.shape). */
@@ -823,7 +831,7 @@ export function scatterAdd(target: Tensor, ids: Tensor, src: Tensor): Tensor {
   return record(out, "scatterAdd", [target, src], (g) => [
     g,
     reshape(indexSelect(reshape(g, [target.shape[0] as number, C]), 0, idd), src.shape),
-  ]);
+  ], fresh([idd], [ids]));
 }
 
 // ============================================================================ selection / masking
@@ -855,7 +863,7 @@ export function where(cond: Tensor, a: Scalar, b: Scalar): Tensor {
     cond.backend.where(cd.buf, gd.buf, zero.buf, n, ga.buf);
     cond.backend.where(cd.buf, zero.buf, gd.buf, n, gb.buf);
     return [unbroadcast(ga, at.shape), unbroadcast(gb, bt.shape)];
-  });
+  }, fresh([cd], [cond]));
 }
 
 /** Fill positions where `mask` is non-zero with `value` (mask broadcasts to x). */
@@ -870,7 +878,7 @@ export function maskedFill(x: Tensor, mask: Tensor, value: number): Tensor {
     const gi = emptyLike(g, x.shape);
     x.backend.maskedFill(dense(g).buf, md.buf, 0, n, gi.buf);
     return [gi];
-  });
+  }, fresh([md], [mask]));
 }
 
 const triMaskCache = new Map<string, Tensor>();
@@ -888,7 +896,7 @@ function triMask(rows: number, cols: number, k: number, upper: boolean, device: 
       data[i * cols + j] = zero ? 1 : 0;
     }
   }
-  const m = Tensor.fromArray(data, [rows, cols], { device: "cpu" }).to(device);
+  const m = escape(Tensor.fromArray(data, [rows, cols], { device: "cpu" }).to(device));
   triMaskCache.set(key, m);
   return m;
 }
@@ -950,18 +958,19 @@ export function crossEntropy(logits: Tensor, targets: Tensor, opts: CrossEntropy
   // For sum/none we ask the kernel for the unscaled gradient (denominator 1) and scale ourselves.
   logits.backend.crossEntropy(ld.buf, td.buf, rows, C, lossRows.buf, gradBuf?.buf, ignoreIndex, reduction === "mean" ? denom : 1);
 
+  const saved = gradBuf ? [gradBuf] : [];
   if (reduction === "none") {
     const out = viewRaw(lossRows, targets.shape, contiguousStrides(targets.shape), 0);
     return record(out, "crossEntropy", [logits], (g) => {
       const gr = viewRaw(dense(g), [rows, 1], [1, 1], 0);
       return [viewRaw(binaryRaw("mul", gradBuf as Tensor, gr), logits.shape, contiguousStrides(logits.shape), 0)];
-    });
+    }, saved);
   }
   const total = reduceRaw("sum", lossRows, [0]);
   const out = reduction === "mean" ? unaryRaw("scale", total, 1 / denom) : total;
   return record(out, "crossEntropy", [logits], (g) => [
     viewRaw(binaryRaw("mul", gradBuf as Tensor, g), logits.shape, contiguousStrides(logits.shape), 0),
-  ]);
+  ], saved);
 }
 
 /** Layer normalisation over the last dimension with affine gamma/beta of shape [C]. */
@@ -989,7 +998,7 @@ export function layerNorm(x: Tensor, gamma: Tensor, beta: Tensor, eps = 1e-5): T
       x.backend.fill(gradBeta.buf, C, 0);
     }
     return [gradX, gradGamma, gradBeta];
-  }, [xd, meanRstd]);
+  }, [...fresh([xd, gd], [x, gamma]), meanRstd]);
 }
 
 /** Inverted dropout: zero with probability p and scale survivors by 1/(1−p). Identity when not training. */

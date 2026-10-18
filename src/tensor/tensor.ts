@@ -10,6 +10,7 @@ import {
   contiguousStrides, flattenNested, inferNestedShape, isContiguous, offsetOfFlat, sizeOf, type Nested, type Shape,
 } from "./shape";
 import { Storage } from "./storage";
+import { trackTensor } from "./scope";
 import * as ops from "../autograd/ops";
 import { backward as runBackward } from "../autograd/graph";
 
@@ -24,6 +25,10 @@ export interface TensorOptions {
 export interface GradFn {
   readonly name: string;
   readonly inputs: readonly Tensor[];
+  /** Fresh tensors owned by the node for backward (freed by `release()`). */
+  readonly saved: readonly Tensor[];
+  /** True once `release()` ran (the graph behind this node is consumed). */
+  readonly released: boolean;
   backward(gradOut: Tensor): (Tensor | null)[];
   release(): void;
 }
@@ -45,6 +50,7 @@ export class Tensor {
   gradFn: GradFn | null = null;
   /** When true, `backward()` keeps this non-leaf tensor's grad. */
   retainsGrad = false;
+  private freed = false;
 
   constructor(storage: Storage, shape: Shape, strides: Shape, offset: number, requiresGrad = false) {
     this.storage = storage;
@@ -54,6 +60,7 @@ export class Tensor {
     this.dtype = storage.dtype;
     this.device = storage.device;
     this.requiresGrad = requiresGrad;
+    trackTensor(this);
   }
 
   // ---------------------------------------------------------------- creation
@@ -221,9 +228,16 @@ export class Tensor {
     return new Tensor(this.storage, shape, strides, offset, false);
   }
 
-  /** Release this tensor's reference to its storage. */
+  /** Release this tensor's reference to its storage (idempotent per handle). */
   free(): void {
+    if (this.freed) return;
+    this.freed = true;
     this.storage.release();
+  }
+
+  /** True once this handle released its storage reference. */
+  get isFreed(): boolean {
+    return this.freed;
   }
 
   /** Same data, no autograd history. */
@@ -231,8 +245,9 @@ export class Tensor {
     return this.viewAs(this.shape, this.strides, this.offset);
   }
 
-  /** Drop the accumulated gradient. */
+  /** Drop the accumulated gradient (its buffer is freed — the tensor owns its grad). */
   zeroGrad(): void {
+    if (this.grad) this.grad.free();
     this.grad = null;
   }
 
