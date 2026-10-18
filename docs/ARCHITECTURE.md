@@ -37,6 +37,20 @@ class Tensor {
 - Views: `reshape/view/transpose/permute/slice/expand` are **zero-copy** on CPU where strides allow; on WebGPU `reshape` of a contiguous tensor is zero-copy, and everything else that produces a non-contiguous layout materialises via a strided-copy kernel (`contiguous()`), because WGSL kernels assume contiguous inputs. `Tensor.isContiguous` documents this.
 - Broadcasting follows NumPy rules; the backend receives explicit output shape + input strides (0 for broadcast dims).
 
+### Tensor implementation notes (as built)
+- `Tensor.isContiguous` means dense row-major strides (offset may be non-zero); `Tensor.isDense` additionally means `offset === 0`, i.e. a kernel can read the buffer directly. Ops call an internal `dense()` that materialises anything else via `copyStrided`.
+- Layering: `tensor.ts` delegates its op *methods* (`t.add(...)`, `t.matmul(...)`, `t.backward()`) to `autograd/ops.ts` / `autograd/graph.ts`. The import cycle is resolved at call time; `dtype/shape/random/storage/device` and both backends stay autograd-free.
+- `Storage` is refcounted: views `retain()`, `Tensor.free()` releases, the backend buffer is freed on the last release. Allocations are at least 4 bytes.
+- `to(device)` is synchronous and only moves CPU → other device; use `await t.cpu()` / `await t.data()` for device → host. `to()` does not record autograd (the result is a leaf that keeps `requiresGrad`).
+- `dataSync()` (CPU only) returns a *live* typed-array view for contiguous tensors and a copy for non-contiguous ones. `itemSync()` and `toArray()` are CPU-only too.
+- In-place helpers without autograd for optimisers: `copy_`, `fill_`, `zero_`.
+- Arithmetic kernels are f32 only. `i32` tensors (token ids, argmax output) support creation, `cat`/`stack`, views, `to()`, `embedding`/`indexSelect` indices and a CPU-only `toDtype`/`float()`/`int()` cast.
+- Naming: `var`/`std` are methods (`t.var(axes, {unbiased, keepDim})`); the functional form is `variance`. `gather(x, dim, ids)` is an alias of `indexSelect`, not PyTorch's element-wise gather. `scatterAdd(target, ids, src)` is out-of-place along dim 0 (`result[ids[i], ...] += src[i, ...]`). `where(cond, a, b)` accepts numbers for `a`/`b`.
+- Gradient conventions: `max`/`min` reductions split the gradient equally among ties; elementwise `maximum`/`minimum` route ties to the first argument; `abs` has gradient 0 at 0; `clamp` passes gradient where the output equals the input.
+- `crossEntropy(logits, targets, {ignoreIndex = -100, reduction = "mean" | "sum" | "none", validCount?})`: the non-ignored count is computed exactly when `targets` live on the CPU; on the GPU it defaults to the number of rows unless `validCount` is passed (no readback is performed in the forward pass).
+- `dropout(x, p, training, seed?)` draws its seed from the global xoshiro generator (`manualSeed` makes it reproducible); `randn`/`rand` likewise accept an explicit `seed`.
+- `backward()`: iterative reverse topological order; gradients stored on leaves are always dense and never aliased with another tensor's grad; non-leaves keep their grad only after `retainGrad()`; a second `backward()` through a released node throws (no `retain_graph`).
+
 ## Backend interface (`src/backend/types.ts`)
 ```ts
 interface Backend {
@@ -65,6 +79,39 @@ interface Backend {
 ```
 Every op in `autograd/ops.ts` must be implemented in terms of this interface so CPU and GPU share identical autograd code.
 
+### Kernel semantics both backends must share
+These are the exact behaviours the CPU backend implements and the autograd layer relies on; the WebGPU kernels must match them.
+- **Buffers**: a CPU `Buf.handle` is an `ArrayBuffer`. `copyStrided`, `copy`, `cat` and slice-backward move raw 32-bit words, so they work for every dtype.
+- **Unary backward helpers take the forward *input* x**: `geluGrad(x) = d gelu/dx`, `tanhGrad(x) = 1 − tanh²x`, `sigmoidGrad(x) = σ(x)(1 − σ(x))`, `reluGrad(x) = x > 0 ? 1 : 0`. `gelu` is the tanh approximation `0.5·x·(1 + tanh(√(2/π)·(x + 0.044715·x³)))`. `clamp` uses `alpha` = min and `beta` = max (±Infinity allowed). `powScalar(x, alpha) = x^alpha`.
+- **binary**: comparison ops write 1.0/0.0 as f32. `max`/`min` return the first argument on ties (`x >= y ? x : y`).
+- **reduce**: `axes` sorted ascending and never empty (the autograd layer short-circuits the no-op case). Identities: sum 0, max −∞, min +∞.
+- **argmax**: index of the *first* maximal element per row; output is i32.
+- **where / maskedFill**: `cond`/`mask` are read as u32 bit patterns, "true" = any non-zero word (so f32 1.0 and u32 1 both work).
+- **gather**: ids outside `[0, rows)` produce a zero row. **scatterAdd**: ids outside the table are skipped; duplicate ids accumulate.
+- **softmaxBackward**: softmax `gradIn = out·(g − Σ g·out)`; log-softmax `gradIn = g − exp(out)·Σ g` (row-wise sums).
+- **layerNorm**: biased variance, `rstd = 1/sqrt(var + eps)`, `meanRstd[2r] = mean`, `meanRstd[2r+1] = rstd`. **layerNormBackward** *overwrites* `gradGamma`/`gradBeta` (it does not accumulate).
+- **crossEntropy**: `lossOut[r] = logsumexp(row) − logit[r, target]`; rows whose target equals `ignoreIndex` *or* is out of range contribute 0 loss and 0 grad. `gradOut = (softmax − onehot) / denom` with `denom = max(1, validCount ?? rows)`. The autograd layer passes `validCount = 1` for `sum`/`none` reductions and scales itself.
+- **adamw** (PyTorch): `p *= 1 − lr·wd; m = β1·m + (1−β1)·g; v = β2·v + (1−β2)·g²; p −= lr · (m / (1−β1^t)) / (sqrt(v / (1−β2^t)) + eps)`.
+- **matmul**: `out` is always dense `batch×M×N`; `transA` means A is stored K×M, `transB` means B is stored N×K; a batch stride of 0 broadcasts a single matrix.
+- **Counter-based RNG** (`rand`, `randn`, `dropoutMask`) — reference implementation in `src/tensor/random.ts`:
+  ```
+  mix(x)           : x ^= x >>> 16; x *= 0x21f0aaad; x ^= x >>> 15; x *= 0x735a2d97; x ^= x >>> 15      (u32, wrapping)
+  splitmix32(x)    : mix(x + 0x9E3779B9)
+  hash(seed, i)    : splitmix32(seed ^ (i * 0x9E3779B9))
+  uniform(seed, i) : (hash(seed, i) >>> 8) / 16777216                      → [0, 1), 24-bit
+  rand[i]          = uniform(seed, i)
+  dropoutMask[i]   = uniform(seed, i) < p ? 0 : 1
+  randn[i]         : j = i & ~1; u1 = uniform(seed, j); u2 = uniform(seed, j | 1)
+                     r = sqrt(−2·ln(1 − u1)); t = 2π·u2;  randn[i] = (i even) ? r·cos t : r·sin t
+  ```
+  WGSL equivalent:
+  ```wgsl
+  fn splitmix32(x0: u32) -> u32 { var x = x0 + 0x9E3779B9u; x ^= x >> 16u; x *= 0x21f0aaadu; x ^= x >> 15u; x *= 0x735a2d97u; x ^= x >> 15u; return x; }
+  fn hash_u32(seed: u32, i: u32) -> u32 { return splitmix32(seed ^ (i * 0x9E3779B9u)); }
+  fn uniform01(seed: u32, i: u32) -> f32 { return f32(hash_u32(seed, i) >> 8u) / 16777216.0; }
+  ```
+  `seed` is passed as a u32 (`seed >>> 0` on the host). GPU normals differ from the CPU only by f32 transcendental rounding.
+
 ### WebGPU backend details
 - `device.ts`: request adapter/device with raised `maxStorageBufferBindingSize`/`maxBufferSize`, the `timestamp-query` feature when available (for the Bench page); a graceful `isWebGpuAvailable()`.
 - `bufferpool.ts`: size-class pooling of `GPUBuffer`s (STORAGE | COPY_SRC | COPY_DST); freed buffers return to the pool; a ring of mappable staging buffers for readback.
@@ -72,9 +119,20 @@ Every op in `autograd/ops.ts` must be implemented in terms of this interface so 
 - Dispatch batching: a `CommandBatch` collects `dispatchWorkgroups` calls into one `GPUCommandEncoder`; `submit()` on readback, on `sync()`, or after 64 dispatches. Uniform parameters go through a ring of small uniform buffers (`writeBuffer` before encoding).
 - Pipeline cache keyed by (kernel name, constants). Workgroup sizes chosen from device limits.
 
+Implementation notes (as built in `src/backend/webgpu/`):
+- Kernel modules are `kernels/{unary,binary,elementwise,matmul,reduce,softmax,layernorm,indexing,loss_optim,rng}.ts` (plain `.ts`, not `.wgsl.ts`); `kernels/index.ts` exports `KERNEL_TEMPLATES` for the syntax test. Each kernel is a template with `{{WG}}`/`{{EXPR}}`/`{{A<i>}}` placeholders; the pipeline cache key is (kernel name, option vars, storage access modes). When one `GPUBuffer` is bound as both input and output of a dispatch, all aliased bindings are promoted to `read_write` so WebGPU usage validation passes.
+- `scatter_add` uses the **deterministic counting-sort approach**: `scatter_hist` (atomicAdd<u32> histogram of ids) → `scan_exclusive` (single-workgroup scan → segment offsets) → `scatter_place` (atomic cursor; arbitrary order inside a segment) → `scatter_rank` (re-orders each segment ascending by source index) → `scatter_segsum` (one thread per (table row, column) sums its segment in index order and accumulates into `gradTable`). Exact f32 sums in a fixed order, so results are bit-reproducible run to run; cost is O(Σ segment²) in `scatter_rank`, fine for realistic token distributions.
+- `layerNormBackward` is three dispatches: per-row `gradX`, per-(column, row-chunk) partial sums of `g·x̂` and `g` into a scratch buffer, then a per-column sum of the chunk partials for `gradGamma`/`gradBeta`.
+- `reduce` merges adjacent kept/reduced dims on the host; a trailing reduced block uses the shared-memory row kernel (`reduce_rows`), anything else the general strided kernel. `sumSquares` is two-stage (per-workgroup partials, then `reduce_rows`).
+- The counter-based RNG is `splitmix32(seed ^ (i * 0x9E3779B9))`, uniform = `(h >>> 8) / 2^24`, normal via Box–Muller on `(i & ~1, i | 1)` with `r = sqrt(-2 ln(1 - u1))` — identical to `src/tensor/random.ts`, so `rand`/`dropoutMask` match the CPU bit-for-bit.
+- Unary backward helpers (`tanhGrad`, `sigmoidGrad`, `geluGrad`, `reluGrad`) all take the forward *input* x, as the CPU backend does.
+- `register.ts` exposes `initWebGpu()` which creates the backend once and calls `registerBackend("webgpu", …)`; `parity.ts` holds the backend-level parity suite (`runParity`, `runParityAndPublish` → `window.__kilnParityDone`) consumed by the Tests page and `scripts/gpu-parity.mjs` (`npm run test:gpu`). Known limits: strided kernels support rank ≤ 6 after dim merging; matmul batch ≤ 65535; `fill` writes f32 bit patterns (zero is dtype-agnostic).
+
 ## Autograd
 - `Node { inputs: Tensor[]; backward(gradOutput: Tensor): (Tensor | null)[]; saved }`. `Tensor.backward()` topologically sorts the graph (reverse DFS), accumulates grads (`grad = grad ? grad + g : g`), frees saved tensors after use. `noGrad(fn)` scope disables recording.
-- Every op in the Tensor list has a tested backward. `tests/gradcheck.test.ts` does central-difference numerical gradient checks (CPU, eps 1e-3, rtol 1e-2) for every op on small random tensors, including broadcasting cases and non-contiguous inputs.
+- Every op in the Tensor list has a tested backward. `tests/gradcheck.test.ts` does central-difference numerical gradient checks (CPU, eps 1e-3, rtol 1e-2, atol 1e-3) for every op on small random tensors, including broadcasting cases and non-contiguous inputs.
+- Backward of views: `slice` writes the gradient into zeros via contiguous `copy` runs (any step), `cat` slices the gradient, `expand`/broadcasting sum it back, `permute` applies the inverse permutation. `cat` forward is also built from `copy` runs (one per outer index per input) so no strided-write kernel is needed.
+- CPU GEMM: NN/TN use a 4-row register-blocked i-k-j kernel (K blocked by 256, N by 512; transposed A is addressed by strides, no copy), NT uses a 2×2 register-blocked dot kernel, TT runs NN on the swapped operands and transposes the result. Transposed *views* feeding `matmul` are fused into `transA`/`transB` (also for batched operands with contiguous batch strides); other layouts are materialised. `tests/matmul-bench.test.ts` is a sanity bound, `scripts/bench-cpu.ts` prints GFLOPS/GB/s tables.
 
 ## nn / optim / models
 - `Module`: `parameters(): Tensor[]`, `namedParameters()`, `stateDict()`, `loadStateDict()`, `train()/eval()`, `to(device)`, `zeroGrad()`.

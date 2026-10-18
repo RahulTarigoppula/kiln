@@ -7,11 +7,14 @@
   "author": "Rahul Tarigoppula",
   "repository": "github:RahulTarigoppula/kiln",
   "homepage": "https://rahultarigoppula.github.io/kiln/",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:gpu": "node scripts/gpu-parity.mjs",
     "train:tiny": "node --import tsx scripts/train-tiny.ts",
     "bench": "node --import tsx scripts/bench-cpu.ts",
     "dev": "vite --config web/vite.config.ts",
@@ -21,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^22.15.0",
     "@webgpu/types": "^0.1.60",
+    "playwright": "^1.64.1",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vite": "^6.0.0",
