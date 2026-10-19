@@ -59,7 +59,7 @@ export function checkpointPicker(scope: Scope): HTMLElement {
       if (c) {
         rows.push(["config", `L${c.nLayer} · H${c.nHead} · d${c.nEmbd} · T${c.blockSize}`]);
         rows.push(["vocab", String(c.vocabSize)]);
-        rows.push(["params", `≈ ${fmtCompact(estimateParams(c))}`]);
+        rows.push(["params", `~ ${fmtCompact(estimateParams(c))}`]);
       }
       if (ck.tokenizer) rows.push(["tokenizer", `${(ck.meta?.tokenizer as { type?: string } | undefined)?.type ?? "?"} · ${ck.tokenizer.vocabSize} tokens`]);
       const log = ck.meta?.trainingLog ?? [];

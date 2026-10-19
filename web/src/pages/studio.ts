@@ -212,7 +212,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
     dataStats.replaceChildren(
       stat(loadingNow ? "..." : fmtCompact(stats.chars), "characters"),
       stat(loadingNow ? "..." : String(stats.charVocab), "distinct chars"),
-      stat(loadingNow ? "..." : `≈ ${fmtCompact(stats.estTokens)}`, "tokens"),
+      stat(loadingNow ? "..." : `~ ${fmtCompact(stats.estTokens)}`, "tokens"),
     );
   });
   const datasetCard = card("Dataset", [sourceSeg, sourceBody, dataStats], { class: "card--tight" });
@@ -277,7 +277,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
     const n = estimateParams(cfg);
     paramEl.textContent = fmtCompact(n, 2);
     paramSub.textContent = `params · vocab ${vocab} · 12·L·d² + (V+T)·d`;
-    memHint.textContent = `≈ ${fmtBytes(estimateTrainingBytes(cfg, batchSize()))} training memory at batch ${batchSize()} (f32 params, grads, Adam moments, activations).`;
+    memHint.textContent = `~ ${fmtBytes(estimateTrainingBytes(cfg, batchSize()))} training memory at batch ${batchSize()} (f32 params, grads, Adam moments, activations).`;
   });
   const modelCard = card(
     "Model",
