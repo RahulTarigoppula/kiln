@@ -180,3 +180,15 @@ describe("GPT", () => {
     expect(bytes.byteLength).toBeGreaterThan(4 * gpt.numParameters());
   });
 });
+
+describe("GPT: prompt longer than blockSize", () => {
+  it("generate crops the context window and still returns prompt + new tokens", async () => {
+    manualSeed(3);
+    const gpt = new GPT(gptConfig("nano", { vocabSize: 10, blockSize: 4 })).eval();
+    const idx = ids([1, 2, 3, 4, 5, 6, 7], [1, 7]);
+    const out = await gpt.generate(idx, 3, { seed: 1 });
+    expect(out.shape).toEqual([1, 10]);
+    expect(Array.from(out.dataSync()).slice(0, 7)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    for (const v of out.dataSync()) expect(v >= 0 && v < 10).toBe(true);
+  });
+});

@@ -132,3 +132,35 @@ describe("checkpoint-node", () => {
     }
   });
 });
+
+describe("safetensors: malformed input throws a clear error (never hangs or returns garbage)", () => {
+  function file(headerJson: string, dataBytes = 4): Uint8Array {
+    const j = new TextEncoder().encode(headerJson);
+    const pad = Math.ceil(j.length / 8) * 8;
+    const b = new Uint8Array(8 + pad + dataBytes);
+    new DataView(b.buffer).setUint32(0, pad, true);
+    b.set(j, 8);
+    b.fill(0x20, 8 + j.length, 8 + pad);
+    return b;
+  }
+  it("rejects a header that is not JSON", () => {
+    expect(() => parseSafetensors(file("abcdefgh"))).toThrow(/not valid JSON/);
+  });
+  it("rejects a header that is not an object", () => {
+    expect(() => parseSafetensors(file("null    "))).toThrow(/JSON object/);
+    expect(() => parseSafetensors(file("[1,2,3] "))).toThrow(/JSON object/);
+  });
+  it("rejects non-integer offsets and negative or fractional shapes", () => {
+    expect(() => parseSafetensors(file(JSON.stringify({ a: { dtype: "F32", shape: [1], data_offsets: ["0", "4"] } })))).toThrow(/data_offsets/);
+    expect(() => parseSafetensors(file(JSON.stringify({ a: { dtype: "F32", shape: [-1, -1], data_offsets: [0, 4] } })))).toThrow(/non-negative integers/);
+    expect(() => parseSafetensors(file(JSON.stringify({ a: { dtype: "F32", shape: [0.5, 2], data_offsets: [0, 4] } })))).toThrow(/non-negative integers/);
+    expect(() => parseSafetensors(file(JSON.stringify({ a: { dtype: "F32", shape: [1], data_offsets: [0] } })))).toThrow(/malformed entry/);
+    expect(() => parseSafetensors(file(JSON.stringify({ a: { dtype: "F64", shape: [1], data_offsets: [0, 8] } }), 8))).toThrow(/unsupported dtype/);
+  });
+  it("still parses a well-formed single tensor built by hand", () => {
+    const b = file(JSON.stringify({ a: { dtype: "F32", shape: [1], data_offsets: [0, 4] } }));
+    const { records } = parseSafetensors(b);
+    expect(records).toHaveLength(1);
+    expect(records[0]?.shape).toEqual([1]);
+  });
+});

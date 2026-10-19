@@ -112,3 +112,34 @@ describe("Trainer", () => {
     expect(final.trainingLog.map((e) => e.step)).toEqual(Array.from({ length: 15 }, (_, i) => i + 1));
   });
 });
+
+describe("Trainer: resume edge cases", () => {
+  it("a finished trainer can load a checkpoint and continue with a larger maxSteps; loading while running throws", async () => {
+    const { model, optimizer } = makeModel();
+    const t = new Trainer({ model, optimizer, train, val, tokenizer: tok, batchSize: 4, maxSteps: 4, evalInterval: 2, evalIters: 1, seed: 3 });
+    await t.run();
+    expect(t.state.status).toBe("done");
+    const ckpt = await t.checkpoint();
+    expect(ckpt.meta.trainingLog.some((e) => typeof e.valLoss === "number")).toBe(true);
+
+    const second = makeModel();
+    const t2 = new Trainer({ model: second.model, optimizer: second.optimizer, train, val, tokenizer: tok, batchSize: 4, maxSteps: 6, seed: 3 });
+    await t2.run();
+    expect(t2.state.status).toBe("done");
+    t2.loadCheckpoint(ckpt.bytes, ckpt.meta);
+    expect(t2.state.status).toBe("idle");
+    expect(t2.state.step).toBe(4);
+    expect(t2.state.lastValLoss).not.toBeNull();
+    const final = await t2.run();
+    expect(final.step).toBe(6);
+    expect(final.trainingLog.map((e) => e.step)).toEqual([1, 2, 3, 4, 5, 6]);
+
+    const third = makeModel();
+    const t3 = new Trainer({ model: third.model, optimizer: third.optimizer, train, batchSize: 4, maxSteps: 50, seed: 3 });
+    const running = t3.run();
+    expect(() => t3.loadCheckpoint(ckpt.bytes, ckpt.meta)).toThrow(/stop the run/);
+    t3.stop();
+    await running;
+    expect(() => t3.loadCheckpoint(ckpt.bytes, { ...ckpt.meta, format: "nope" } as unknown as typeof ckpt.meta)).toThrow(/kiln.v1/);
+  });
+});

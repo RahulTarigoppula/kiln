@@ -253,6 +253,8 @@ export class Trainer {
 
   /** Restore weights, optimizer state, step count and log from a checkpoint made by `checkpoint()`. */
   loadCheckpoint(bytes: Uint8Array | ArrayBuffer, meta: KilnCheckpointMeta): void {
+    if (this.status === "running" || this.status === "paused") throw new Error("Trainer.loadCheckpoint: stop the run before loading a checkpoint");
+    if (!meta || meta.format !== "kiln.v1" || !Array.isArray(meta.trainingLog)) throw new Error("Trainer.loadCheckpoint: meta is not a kiln.v1 sidecar");
     const { records } = parseSafetensors(bytes);
     const sd = recordsToStateDict(records);
     const tied = (meta.extra as GPTCheckpointExtra | undefined)?.tied ?? {};
@@ -269,6 +271,13 @@ export class Trainer {
     this.log.push(...meta.trainingLog.map((e) => ({ ...e })));
     const last = this.log[this.log.length - 1];
     this.lastLoss = last?.loss ?? null;
+    const lastVal = [...this.log].reverse().find((e) => typeof e.valLoss === "number");
+    this.lastValLoss = lastVal?.valLoss ?? null;
+    // A finished run may be resumed with a larger maxSteps; clear the terminal status and any stale pending readbacks.
+    this.status = "idle";
+    this.stopRequested = false;
+    this.pending = [];
+    this.lr = this.opts.lrSchedule ? this.opts.lrSchedule(this.step) : this.opts.optimizer.lr;
   }
 
   /** Read back pending losses (one device sync), fire `onStep`, append to the log. */

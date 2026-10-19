@@ -484,7 +484,15 @@ export async function mount(root: HTMLElement): Promise<() => void> {
   const runCard = card("Run", [runInfo, h("div", { class: "field__hint", style: "margin-top:12px" }, "Training runs in a Web Worker so the page never stalls; it falls back to the main thread when the worker has no WebGPU. Checkpoints download as safetensors + a JSON sidecar (config, tokenizer, training log).")], { class: "card--tight" });
 
   // ------------------------------------------------------------ layout
-  root.appendChild(pageHead("Train live", "Studio", "Pick a corpus, a tokenizer and a GPT preset, then watch the loss fall on your GPU. Everything here - kernels, autograd, optimiser - is Kiln's own TypeScript.", []));
+  root.appendChild(pageHead("Train live", "Studio", "Pick a corpus, a tokenizer and a GPT preset, then press Start and watch the loss fall on your GPU. Everything here - kernels, autograd, optimiser - is Kiln's own TypeScript, and it all runs inside this tab: nothing you paste or upload leaves your device.", []));
+  if (!hasGpu) {
+    root.appendChild(
+      notice("warn", [
+        h("b", null, "WebGPU is not available in this browser, so training will run on a single CPU thread (slow). "),
+        "Training needs WebGPU: Chrome or Edge 113+, Safari 26+, or Firefox 141+ on Windows. The nano preset still trains on the CPU if you want to try it; the Playground and Inspect pages work fully without a GPU.",
+      ]),
+    );
+  }
   root.appendChild(
     h(
       "div",

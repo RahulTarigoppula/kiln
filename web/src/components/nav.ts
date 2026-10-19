@@ -26,7 +26,7 @@ export function deviceBadge(): HTMLElement {
       el.classList.add("badge--cpu");
       label.textContent = "CPU fallback";
       kind.textContent = s.apiPresent ? "no adapter" : "no WebGPU";
-      el.title = s.error ?? "WebGPU unavailable";
+      el.title = `${s.error ?? "WebGPU unavailable"}\nTraining, Bench and the parity Tests need WebGPU (Chrome/Edge 113+, Safari 26+, Firefox 141+ on Windows). The Playground and Inspect pages work on the CPU.`;
     } else {
       el.classList.add("badge--init");
       label.textContent = s.status === "initializing" ? "Requesting GPU…" : "Device";
@@ -72,7 +72,7 @@ export function footer(): HTMLElement {
     h(
       "div",
       { class: "container footer__inner" },
-      h("div", null, "Kiln - a WebGPU deep-learning framework written from scratch in TypeScript. Zero runtime dependencies."),
+      h("div", null, "Kiln - a WebGPU deep-learning framework written from scratch in TypeScript. Zero runtime dependencies. ", h("b", null, "Everything runs in this tab:"), " your text, models and checkpoints never leave your device. No analytics, no server."),
       h(
         "div",
         { class: "row" },

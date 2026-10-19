@@ -140,3 +140,18 @@ describe("CharTokenizer", () => {
     expect(() => new CharTokenizer(["a", "a"])).toThrow();
   });
 });
+
+describe("ByteLevelBPE: degenerate inputs", () => {
+  it("trains on empty and whitespace-only text and encodes/decodes them without throwing", () => {
+    const empty = ByteLevelBPE.train("", 300);
+    expect(empty.vocabSize).toBe(257);
+    expect(Array.from(empty.encode(""))).toEqual([]);
+    expect(empty.decode([])).toBe("");
+    const ws = ByteLevelBPE.train("   \n\n  ", 300);
+    expect(ws.decode(ws.encode("  \n"))).toBe("  \n");
+    const t = ByteLevelBPE.train("hello world hello", 300);
+    expect(Array.from(t.encode(""))).toEqual([]);
+    expect(t.decode(t.encode("   "))).toBe("   ");
+    expect(t.decode(t.encode("\t\r\n"))).toBe("\t\r\n");
+  });
+});

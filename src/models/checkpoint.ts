@@ -99,33 +99,46 @@ export function parseSafetensors(input: Uint8Array | ArrayBuffer): ParsedSafeten
   const headerLen = hi * 2 ** 32 + lo;
   if (headerLen > HEADER_LIMIT || 8 + headerLen > bytes.byteLength) throw new Error("parseSafetensors: invalid header length");
   const headerText = new TextDecoder("utf-8").decode(bytes.subarray(8, 8 + headerLen));
-  const header = JSON.parse(headerText) as Record<string, unknown>;
+  let header: unknown;
+  try {
+    header = JSON.parse(headerText);
+  } catch (err: unknown) {
+    throw new Error(`parseSafetensors: header is not valid JSON (${err instanceof Error ? err.message : String(err)}); is this a safetensors file?`);
+  }
+  if (typeof header !== "object" || header === null || Array.isArray(header)) throw new Error("parseSafetensors: header must be a JSON object");
   const dataStart = 8 + headerLen;
   const dataLen = bytes.byteLength - dataStart;
   const records: TensorRecord[] = [];
   let metadata: Record<string, string> = {};
-  for (const [name, entry] of Object.entries(header)) {
+  for (const [name, entry] of Object.entries(header as Record<string, unknown>)) {
     if (name === "__metadata__") {
       if (entry && typeof entry === "object") {
         for (const [k, v] of Object.entries(entry as Record<string, unknown>)) metadata[k] = String(v);
       }
       continue;
     }
-    const e = entry as { dtype?: string; shape?: number[]; data_offsets?: [number, number] };
-    if (!e || !e.dtype || !Array.isArray(e.shape) || !Array.isArray(e.data_offsets)) throw new Error(`parseSafetensors: malformed entry "${name}"`);
-    const [s, eEnd] = e.data_offsets;
-    if (s < 0 || eEnd < s || eEnd > dataLen) throw new Error(`parseSafetensors: offsets out of range for "${name}"`);
+    const e = entry as { dtype?: unknown; shape?: unknown; data_offsets?: unknown };
+    if (!e || typeof e !== "object" || typeof e.dtype !== "string" || !Array.isArray(e.shape) || !Array.isArray(e.data_offsets) || e.data_offsets.length !== 2) {
+      throw new Error(`parseSafetensors: malformed entry "${name}"`);
+    }
+    if (!e.shape.every((d) => Number.isInteger(d) && (d as number) >= 0)) throw new Error(`parseSafetensors: shape of "${name}" must be non-negative integers`);
+    const [s, eEnd] = e.data_offsets as [unknown, unknown];
+    if (!Number.isInteger(s) || !Number.isInteger(eEnd)) throw new Error(`parseSafetensors: data_offsets of "${name}" must be integers`);
+    const start = s as number;
+    const end = eEnd as number;
+    if (start < 0 || end < start || end > dataLen) throw new Error(`parseSafetensors: offsets out of range for "${name}"`);
     const dtype = e.dtype as SafeDType;
     if (!(dtype in BYTES_PER_ELEMENT)) throw new Error(`parseSafetensors: unsupported dtype ${e.dtype} for "${name}"`);
-    const numel = e.shape.reduce((a, b) => a * b, 1);
-    if (numel * BYTES_PER_ELEMENT[dtype] !== eEnd - s) throw new Error(`parseSafetensors: size mismatch for "${name}"`);
+    const shape = e.shape as number[];
+    const numel = shape.reduce((a, b) => a * b, 1);
+    if (numel * BYTES_PER_ELEMENT[dtype] !== end - start) throw new Error(`parseSafetensors: size mismatch for "${name}"`);
     // Copy into a fresh, aligned ArrayBuffer. `ArrayBuffer.prototype.slice` is used on purpose: a Node `Buffer`
     // overrides `Uint8Array.prototype.slice` to return a *view* into its shared pool, so `bytes.slice(...).buffer`
     // would be the pool and offset 0 would read someone else's bytes.
-    const begin = bytes.byteOffset + dataStart + s;
-    const copy = bytes.buffer.slice(begin, begin + (eEnd - s));
+    const begin = bytes.byteOffset + dataStart + start;
+    const copy = bytes.buffer.slice(begin, begin + (end - start));
     const data = dtype === "F32" ? new Float32Array(copy, 0, numel) : new Int32Array(copy, 0, numel);
-    records.push({ name, dtype, shape: [...e.shape], data });
+    records.push({ name, dtype, shape: [...shape], data });
   }
   metadata = Object.freeze({ ...metadata });
   return { records, metadata };

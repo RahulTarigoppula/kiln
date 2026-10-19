@@ -8,6 +8,8 @@ A deep-learning framework written from scratch in TypeScript, with a WebGPU back
 
 No PyTorch, no TensorFlow.js, no WASM: every kernel, the autograd engine, the optimiser, the tokenizer and the training loop are in this repository. Zero runtime dependencies.
 
+**Everything runs in the browser.** The web app is static files on GitHub Pages: training, generation and checkpoint export happen in your tab, text you paste or upload and the models you train never leave your device, and there is no analytics, telemetry or server of any kind. Training, Bench and the parity Tests need WebGPU; the Playground and Inspect pages fall back to the CPU backend.
+
 ## What is in the box
 
 - **Tensor library** (`src/tensor`): f32/i32 tensors with NumPy broadcasting, zero-copy views (reshape, transpose, slice, expand), refcounted storage and a seeded xoshiro128** RNG.
@@ -80,6 +82,8 @@ Measured in the Bench page of the web app on a laptop with an AMD Ryzen 7 5800H 
 | layernorm rows | 8192 x 1024 | 135 k rows/s | 2.58 M rows/s | 19x |
 
 End to end, the Studio trains the `micro` preset (4 layers, 4 heads, d = 128, context 128, batch 32, 820 k parameters, char-level TinyShakespeare) at about 6 k tokens/s (350 to 700 ms per optimizer step depending on what else the machine is doing, roughly 1,300 kernel dispatches per step) on that integrated GPU, with GPU memory flat at 10.5 MB of live buffers for the whole run. Discrete GPUs are considerably faster; the per-dispatch cost measured in-browser is 20 to 60 microseconds.
+
+CPU training step (Node 22, `nano` preset, batch 16, context 64, char-level, same loaded laptop): 280 to 360 ms per optimizer step, about 3.2 k tokens/s. A `node --cpu-prof` profile puts 76% of the step inside the two GEMM kernels (`gemmRows4` 59%, `gemmNT` 17%) and no other function above 4%, so the CPU path is compute-bound rather than overhead-bound; a 4x2 register block for the NT kernel was tried and rejected (2x slower under V8, presumably register spilling), so the 2x2 block stays.
 
 GPU parity suite (Tests page, same machine): 165 of 165 cases pass in 2.5 s on the AMD integrated GPU; the headless CI run on a GPU-less runner reports "WebGPU unavailable" and exits 0.
 
@@ -162,7 +166,7 @@ When than my bone thath pant the slep a this wen.
 
 ## Testing
 
-- `npm test`: 137 vitest cases in 15 files on the CPU backend: shape and stride math, every op against golden values, numerical gradient checks (106 `gradcheck` comparisons over 19 test cases, central differences, eps 1e-3), nn layers against reference computations, a GPT that learns to copy a sequence in under 30 steps, tokenizer round trips, safetensors round trips, the trainer (schedule, pause / resume / stop, checkpoint resume), and buffer-count flatness across training steps and generation.
+- `npm test`: 144 vitest cases in 15 files on the CPU backend: shape and stride math, every op against golden values, numerical gradient checks (106 `gradcheck` comparisons over 19 test cases, central differences, eps 1e-3), nn layers against reference computations, a GPT that learns to copy a sequence in under 30 steps (and generation from a prompt longer than `blockSize`), tokenizer round trips (including empty and whitespace-only input), safetensors round trips plus malformed-input rejection (non-JSON or non-object headers, non-integer offsets, negative or fractional shapes all throw a named error), the trainer (schedule, pause / resume / stop, checkpoint resume, resuming a finished run), and buffer-count flatness across training steps and generation.
 - `tests/wgsl-syntax.test.ts`: every WGSL template is instantiated and checked for balanced braces, resolved placeholders and declared bindings without a GPU.
 - **GPU parity** (`src/backend/webgpu/parity.ts`): every backend method runs on both devices with random inputs (odd sizes, broadcasting, batched and transposed matmuls, duplicate scatter ids, ignore-index rows, the two-stage and prime-row reduction paths) and the outputs are compared; 165 cases. Runs in the Tests page and headless via `npm run test:gpu` (Playwright + Chromium with SwiftShader flags; CI runs it as a best-effort job that does not block).
 - `npm run typecheck` with `strict`, `noUncheckedIndexedAccess`, `verbatimModuleSyntax`; `npm run lint:text` bans typographic dashes, curly quotes and arrows in tracked files.
