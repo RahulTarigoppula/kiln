@@ -231,7 +231,7 @@ export async function loadCheckpointFromFiles(safetensors: File, metaFile: File 
   return finishCheckpoint({ ...parsed, meta }, safetensors.name);
 }
 
-/** The token-embedding table (vocab × nEmbd) of a checkpoint, if recognisable. */
+/** The token-embedding table (vocab x nEmbd) of a checkpoint, if recognisable. */
 export function findEmbeddingRecord(ckpt: LoadedCheckpoint): TensorRecord | null {
   const named = ckpt.records.find((r) => /(^|\.)(wte|tok_emb|token_embedding|embedding)(\.weight)?$/i.test(r.name) && r.shape.length === 2);
   if (named) return named;
@@ -270,7 +270,7 @@ export interface TokenEvent {
 }
 
 export interface AttentionMaps {
-  /** weights[layer] is nHead × T × T, row-major. */
+  /** weights[layer] is nHead x T x T, row-major. */
   weights: Float32Array[];
   nLayer: number;
   nHead: number;

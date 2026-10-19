@@ -22,7 +22,7 @@ export interface BlockOptions {
   device?: Device;
 }
 
-/** Feed-forward network: Linear(4×) -> GELU -> Linear -> Dropout. */
+/** Feed-forward network: Linear(4x) -> GELU -> Linear -> Dropout. */
 export class MLP extends Module {
   c_fc: Linear;
   gelu: GELU;

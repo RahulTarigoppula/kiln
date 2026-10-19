@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Tensor } from "../src/tensor/tensor";
 import { cpuBackend } from "../src/backend/cpu/index";
 
-/** Sanity bound, not a performance target: a 256×256×256 matmul must finish well under a second. */
+/** Sanity bound, not a performance target: a 256x256x256 matmul must finish well under a second. */
 describe("matmul performance sanity", () => {
   it("256x256 matmul runs under a generous bound", () => {
     const n = 256;

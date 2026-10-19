@@ -66,7 +66,7 @@ async function afterLoad(ckpt: LoadedCheckpoint): Promise<void> {
 }
 
 export async function loadShipped(which: ShippedCheckpoint = DEFAULT_CHECKPOINT): Promise<void> {
-  loading.set(`Fetching ${which.label}…`);
+  loading.set(`Fetching ${which.label}...`);
   loadError.set(null);
   try {
     await afterLoad(await loadCheckpointFromUrl(which.url));
@@ -85,7 +85,7 @@ export async function loadFromFiles(files: FileList | File[]): Promise<void> {
     loadError.set("Pick a .safetensors file (plus its .json sidecar).");
     return;
   }
-  loading.set(`Reading ${st.name}…`);
+  loading.set(`Reading ${st.name}...`);
   loadError.set(null);
   try {
     await afterLoad(await loadCheckpointFromFiles(st, meta));

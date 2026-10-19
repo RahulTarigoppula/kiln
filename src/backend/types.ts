@@ -65,9 +65,9 @@ export interface Backend {
 
   // ---- linear algebra ----
   /**
-   * Batched matmul: for each batch b, out[b] (M×N) = opA(a[b]) (M×K) · opB(b[b]) (K×N).
+   * Batched matmul: for each batch b, out[b] (MxN) = opA(a[b]) (MxK) · opB(b[b]) (KxN).
    * a[b] starts at element offset b*aBatchStride (0 means broadcast the single matrix), same for b.
-   * transA means a is stored as K×M; transB means b is stored as N×K. out is always contiguous batch×M×N.
+   * transA means a is stored as KxM; transB means b is stored as NxK. out is always contiguous batchxMxN.
    */
   matmul(a: Buf, b: Buf, out: Buf, batch: number, M: number, K: number, N: number,
          transA: boolean, transB: boolean, aBatchStride: number, bBatchStride: number): void;
@@ -75,7 +75,7 @@ export interface Backend {
   // ---- reductions ----
   /** Reduce `a` of `shape` over `axes` (sorted ascending). out has the reduced shape with those axes removed. */
   reduce(op: ReduceOp, a: Buf, shape: number[], axes: number[], out: Buf): void;
-  /** Row-wise argmax for rows×cols -> out (i32, rows). */
+  /** Row-wise argmax for rowsxcols -> out (i32, rows). */
   argmax(a: Buf, rows: number, cols: number, out: Buf): void;
 
   // ---- fused row kernels ----
@@ -87,8 +87,8 @@ export interface Backend {
   layerNormBackward(x: Buf, gamma: Buf, meanRstd: Buf, gradOut: Buf, rows: number, cols: number,
                     gradX: Buf, gradGamma: Buf, gradBeta: Buf): void;
   /**
-   * Fused cross-entropy over rows×cols logits with i32 targets (rows). lossOut receives per-row loss (rows f32).
-   * If gradOut is given it receives d(mean loss)/d(logits) scaled by 1/rows (rows×cols f32). Targets equal to
+   * Fused cross-entropy over rowsxcols logits with i32 targets (rows). lossOut receives per-row loss (rows f32).
+   * If gradOut is given it receives d(mean loss)/d(logits) scaled by 1/rows (rowsxcols f32). Targets equal to
    * ignoreIndex contribute 0 loss and 0 grad (and are excluded from the mean denominator - pass validCount).
    */
   crossEntropy(logits: Buf, targets: Buf, rows: number, cols: number, lossOut: Buf, gradOut?: Buf,

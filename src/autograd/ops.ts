@@ -824,7 +824,7 @@ export function scatterAdd(target: Tensor, ids: Tensor, src: Tensor): Tensor {
   const rest = target.shape.slice(1);
   const C = sizeOf(rest);
   const n = ids.numel;
-  if (src.numel !== n * C) throw new Error(`scatterAdd: src [${src.shape.join(",")}] must hold ids.numel × ${C} elements`);
+  if (src.numel !== n * C) throw new Error(`scatterAdd: src [${src.shape.join(",")}] must hold ids.numel x ${C} elements`);
   const out = cloneRaw(target);
   const idd = dense(ids);
   if (n > 0) target.backend.scatterAdd(dense(src).buf, idd.buf, n, C, out.buf);

@@ -67,7 +67,7 @@ export function mount(root: HTMLElement): () => void {
     layerSel.disabled = !c;
     headSel.disabled = !c;
     computeBtn.disabled = !ck;
-    paramSel.replaceChildren(...(ck?.records ?? []).map((r) => h("option", { value: r.name }, `${r.name}  [${r.shape.join("×")}]`)));
+    paramSel.replaceChildren(...(ck?.records ?? []).map((r) => h("option", { value: r.name }, `${r.name}  [${r.shape.join("x")}]`)));
     paramSel.disabled = !ck;
     const emb = ck ? findEmbeddingRecord(ck) : null;
     paramName.set(emb?.name ?? ck?.records[0]?.name ?? "");
@@ -185,7 +185,7 @@ export function mount(root: HTMLElement): () => void {
       })),
     );
     pcaBox.setEmpty(null);
-    pcaChips.append(chip("tensor", rec.name), chip("shape", rec.shape.join("×")), chip("pc1", fmtPercent(res.explained[0] ?? 0), "ember"), chip("pc2", fmtPercent(res.explained[1] ?? 0), "ember"));
+    pcaChips.append(chip("tensor", rec.name), chip("shape", rec.shape.join("x")), chip("pc1", fmtPercent(res.explained[0] ?? 0), "ember"), chip("pc2", fmtPercent(res.explained[1] ?? 0), "ember"));
     if (useRows < rows) pcaChips.append(chip("shown", `${useRows}/${rows} rows`, "warn"));
   }
 

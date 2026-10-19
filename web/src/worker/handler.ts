@@ -64,7 +64,7 @@ export function createTrainHandler(post: PostEvent, inWorker: boolean): TrainHan
       if (!backend && job.preferGpu && isWebGpuAvailable()) await init(true);
       const dev: Device = job.preferGpu && backend ? "webgpu" : "cpu";
 
-      post({ type: "status", phase: "tokenizer", message: job.tokenizer.kind === "bpe" ? `Training byte-level BPE (vocab ${job.tokenizer.vocabSize})…` : "Building character vocabulary…" });
+      post({ type: "status", phase: "tokenizer", message: job.tokenizer.kind === "bpe" ? `Training byte-level BPE (vocab ${job.tokenizer.vocabSize})...` : "Building character vocabulary..." });
       await tick();
       let lastReport = 0;
       tokenizer = buildTokenizer(job.tokenizer, job.text, (done, total) => {
@@ -75,7 +75,7 @@ export function createTrainHandler(post: PostEvent, inWorker: boolean): TrainHan
         }
       });
 
-      post({ type: "status", phase: "encode", message: `Encoding ${job.text.length.toLocaleString()} characters…` });
+      post({ type: "status", phase: "encode", message: `Encoding ${job.text.length.toLocaleString()} characters...` });
       await tick();
       const config: GPTConfig = { ...job.model, vocabSize: tokenizer.vocabSize };
       const { train, val, summary } = buildDataset(tokenizer, job.text, config.blockSize);
@@ -90,7 +90,7 @@ export function createTrainHandler(post: PostEvent, inWorker: boolean): TrainHan
         paramCount,
       });
 
-      post({ type: "status", phase: "model", message: `Initialising GPT (${paramCount.toLocaleString()} params) on ${dev}…` });
+      post({ type: "status", phase: "model", message: `Initialising GPT (${paramCount.toLocaleString()} params) on ${dev}...` });
       await tick();
       maxSteps = job.hyper.maxSteps;
       stepsDone = 0;

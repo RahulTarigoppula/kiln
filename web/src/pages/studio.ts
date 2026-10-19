@@ -210,9 +210,9 @@ export async function mount(root: HTMLElement): Promise<() => void> {
     const stats = quickTextStats(t, { kind: tokKind(), vocabSize: bpeVocab() });
     const loadingNow = textLoading();
     dataStats.replaceChildren(
-      stat(loadingNow ? "…" : fmtCompact(stats.chars), "characters"),
-      stat(loadingNow ? "…" : String(stats.charVocab), "distinct chars"),
-      stat(loadingNow ? "…" : `≈ ${fmtCompact(stats.estTokens)}`, "tokens"),
+      stat(loadingNow ? "..." : fmtCompact(stats.chars), "characters"),
+      stat(loadingNow ? "..." : String(stats.charVocab), "distinct chars"),
+      stat(loadingNow ? "..." : `≈ ${fmtCompact(stats.estTokens)}`, "tokens"),
     );
   });
   const datasetCard = card("Dataset", [sourceSeg, sourceBody, dataStats], { class: "card--tight" });
@@ -541,7 +541,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
       samples.set([]);
       checkpointReady.set(false);
       metrics.set({ step: 0, loss: NaN, valLoss: NaN, lr: NaN, tps: NaN, msStep: NaN, eta: NaN, mem: NaN });
-      status.set({ message: "Preparing…", progress: null });
+      status.set({ message: "Preparing...", progress: null });
       sessionState.set("preparing");
     });
     scheduleChart();

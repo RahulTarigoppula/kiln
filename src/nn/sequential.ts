@@ -9,7 +9,7 @@ export interface UnaryModule extends Module {
   forward(x: Tensor): Tensor;
 }
 
-/** Applies its layers in order; children are named "0", "1", … */
+/** Applies its layers in order; children are named "0", "1", ... */
 export class Sequential extends Module {
   readonly layers: UnaryModule[];
 

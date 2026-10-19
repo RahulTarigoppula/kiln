@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Headless GPU ↔ CPU parity run.
+ * Headless GPU vs CPU parity run.
  *
  * Serves `web/dist` (build it first: `npm run build`), opens `/kiln/#/tests` in Chromium with SwiftShader
  * WebGPU flags, waits for `window.__kilnParityDone` (set by `runParityAndPublish` in

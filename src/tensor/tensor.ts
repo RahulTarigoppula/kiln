@@ -133,7 +133,7 @@ export class Tensor {
     return Tensor.fromArray(arr, [steps], { ...opts, dtype: "f32" });
   }
 
-  /** Identity matrix n×m. */
+  /** Identity matrix nxm. */
   static eye(n: number, m?: number, opts: TensorOptions = {}): Tensor {
     const cols = m ?? n;
     const dtype = opts.dtype ?? "f32";

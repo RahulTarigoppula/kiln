@@ -17,7 +17,7 @@ function expectClose(t: Tensor, expected: ArrayLike<number>, shape?: number[], t
   }
 }
 
-/** Naive reference matmul for a[M×K] · b[K×N] given as flat row-major arrays. */
+/** Naive reference matmul for a[MxK] · b[KxN] given as flat row-major arrays. */
 function refMatmul(a: ArrayLike<number>, b: ArrayLike<number>, M: number, K: number, N: number): Float32Array {
   const out = new Float32Array(M * N);
   for (let i = 0; i < M; i++) for (let j = 0; j < N; j++) {
@@ -254,8 +254,8 @@ describe("matmul", () => {
     const A = Tensor.randn([M, K], { seed: 1 });
     const B = Tensor.randn([K, N], { seed: 2 });
     const ref = refMatmul(A.dataSync(), B.dataSync(), M, K, N);
-    const At = A.transpose().contiguous(); // stored K×M
-    const Bt = B.transpose().contiguous(); // stored N×K
+    const At = A.transpose().contiguous(); // stored KxM
+    const Bt = B.transpose().contiguous(); // stored NxK
     expectClose(A.matmul(B), ref, [M, N], 1e-4);
     expectClose(A.matmul(Bt.transpose()), ref, [M, N], 1e-4);
     expectClose(At.transpose().matmul(B), ref, [M, N], 1e-4);

@@ -1,7 +1,7 @@
 /**
  * Tiled f32 matmul: `out[b] = opA(a[b]) · opB(b[b])`.
  *
- * - 64×64 output tile per workgroup, BK = 16, 16×16 threads each owning a 4×4 register block
+ * - 64x64 output tile per workgroup, BK = 16, 16x16 threads each owning a 4x4 register block
  *   (rows ty + 16·i, cols tx + 16·j so shared-memory reads are broadcast/coalesced).
  * - transA/transB handled by index math on the global loads; the shared tile layout is always
  *   `As[k][m]`, `Bs[k][n]`, and the load mapping is chosen so global reads are contiguous either way.
@@ -102,7 +102,7 @@ fn main(@builtin(local_invocation_id) lid: vec3<u32>, @builtin(workgroup_id) wid
 }
 `;
 
-/** Build the tiled matmul kernel (fixed 64×64×16 tiles, 256 threads). */
+/** Build the tiled matmul kernel (fixed 64x64x16 tiles, 256 threads). */
 export function matmulKernel(): KernelBuilder {
   return makeBuilder("matmul_tiled", MATMUL_TEMPLATE, { TILE: MATMUL_TILE, BK: MATMUL_BK }, ["read", "read", "read_write"]);
 }

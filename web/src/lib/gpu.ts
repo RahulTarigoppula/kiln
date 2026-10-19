@@ -21,7 +21,7 @@ export interface GpuState {
 
 export const gpuState = signal<GpuState>({ status: "idle", backend: null, info: null, apiPresent: isWebGpuAvailable(), error: null });
 
-/** Number of running jobs (bench, parity, training…). The badge pulses when > 0. */
+/** Number of running jobs (bench, parity, training...). The badge pulses when > 0. */
 export const busyCount = signal(0);
 
 export function markBusy<T>(p: Promise<T>): Promise<T> {

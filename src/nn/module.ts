@@ -322,7 +322,7 @@ export class Module {
   }
 }
 
-/** An indexable list of modules whose children are named "0", "1", … */
+/** An indexable list of modules whose children are named "0", "1", ... */
 export class ModuleList<M extends Module = Module> extends Module {
   readonly items: M[];
 

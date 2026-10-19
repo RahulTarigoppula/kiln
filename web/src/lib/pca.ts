@@ -1,12 +1,12 @@
 /**
  * Principal component analysis by power iteration with deflation, on a dense row-major matrix.
- * Suitable for token-embedding tables (vocab × d) in the browser.
+ * Suitable for token-embedding tables (vocab x d) in the browser.
  */
 
 export interface PcaResult {
-  /** k components, each of length `cols` (unit norm), row-major k×cols. */
+  /** k components, each of length `cols` (unit norm), row-major kxcols. */
   components: Float32Array;
-  /** Projected rows, row-major rows×k. */
+  /** Projected rows, row-major rowsxk. */
   projected: Float32Array;
   /** Column means that were subtracted. */
   mean: Float32Array;
@@ -97,7 +97,7 @@ export function pca(matrix: Float32Array, rows: number, cols: number, opts: PcaO
     }
     eigenvalues.push(lambda);
     for (let c = 0; c < cols; c++) components[comp * cols + c] = v[c] ?? 0;
-    // Deflate: X ← X − (X v) vᵀ
+    // Deflate: X <- X − (X v) vᵀ
     for (let r = 0; r < rows; r++) {
       const base = r * cols;
       let s = 0;

@@ -141,7 +141,7 @@ export function buildCases(opts: BenchOptions): Case[] {
     cases.push({
       group: "matmul",
       kernel: "matmul f32",
-      size: `${n}×${n}×${n}`,
+      size: `${n}x${n}x${n}`,
       unit: "GFLOPS",
       work: 2 * n * n * n,
       cpu: opts.includeCpu && n <= opts.cpuMaxMatmul,
@@ -151,8 +151,8 @@ export function buildCases(opts: BenchOptions): Case[] {
   }
   cases.push({ group: "elementwise", kernel: "add (a+b)", size: `${(EW_N / 1e6).toFixed(0)}M f32`, unit: "GB/s", work: EW_N * 4 * 3, cpu: opts.includeCpu, gpu: opts.gpu !== null, run: (b) => elementwiseCase(b, "add") });
   cases.push({ group: "elementwise", kernel: "gelu", size: `${(EW_N / 1e6).toFixed(0)}M f32`, unit: "GB/s", work: EW_N * 4 * 2, cpu: opts.includeCpu, gpu: opts.gpu !== null, run: (b) => elementwiseCase(b, "gelu") });
-  cases.push({ group: "softmax", kernel: "softmax rows", size: `${ROWS}×${COLS}`, unit: "rows/s", work: ROWS, cpu: opts.includeCpu, gpu: opts.gpu !== null, run: softmaxCase });
-  cases.push({ group: "layernorm", kernel: "layernorm rows", size: `${ROWS}×${COLS}`, unit: "rows/s", work: ROWS, cpu: opts.includeCpu, gpu: opts.gpu !== null, run: layerNormCase });
+  cases.push({ group: "softmax", kernel: "softmax rows", size: `${ROWS}x${COLS}`, unit: "rows/s", work: ROWS, cpu: opts.includeCpu, gpu: opts.gpu !== null, run: softmaxCase });
+  cases.push({ group: "layernorm", kernel: "layernorm rows", size: `${ROWS}x${COLS}`, unit: "rows/s", work: ROWS, cpu: opts.includeCpu, gpu: opts.gpu !== null, run: layerNormCase });
   return cases;
 }
 
@@ -201,7 +201,7 @@ export function toMarkdown(rows: BenchRow[], adapter: string | null): string {
     "|---|---|---|---:|---:|---:|",
   ];
   for (const r of rows) {
-    const speed = r.cpu !== null && r.gpu !== null && r.cpu > 0 ? `${(r.gpu / r.cpu).toFixed(1)}×` : "-";
+    const speed = r.cpu !== null && r.gpu !== null && r.cpu > 0 ? `${(r.gpu / r.cpu).toFixed(1)}x` : "-";
     lines.push(`| ${r.kernel} | ${r.size} | ${r.unit} | ${formatMetric(r.cpu, r.unit)} | ${formatMetric(r.gpu, r.unit)} | ${speed} |`);
   }
   return lines.join("\n");

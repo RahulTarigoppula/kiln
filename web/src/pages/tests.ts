@@ -1,4 +1,4 @@
-/** Tests - in-browser GPU ↔ CPU parity suite (`runParityAndPublish` -> window.__kilnParityDone). */
+/** Tests - in-browser GPU vs CPU parity suite (`runParityAndPublish` -> window.__kilnParityDone). */
 import { runParityAndPublish, type ParityResult } from "../../../src/backend/webgpu/parity";
 import { h, svg, icons, KILN_MARK } from "../lib/dom";
 import { Scope, signal } from "../lib/signals";
@@ -28,7 +28,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
   });
   root.appendChild(
     pageHead(
-      "GPU ↔ CPU parity",
+      "GPU vs CPU parity",
       "Tests",
       "Every Backend kernel runs on both devices with random inputs (odd sizes, broadcasting, batches, transposes, duplicate ids) and the outputs are compared. Threshold 1e-4; 1e-3 for matmul with large K.",
       backend ? [filterBtn, rerun] : [],
@@ -113,7 +113,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
         ),
       ),
     );
-    if (!shown.length) tbody.appendChild(h("tr", null, h("td", { class: "dim" }, only ? "No failures." : "Waiting for results…")));
+    if (!shown.length) tbody.appendChild(h("tr", null, h("td", { class: "dim" }, only ? "No failures." : "Waiting for results...")));
   }
 
   scope.effect(() => {
@@ -144,7 +144,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
     running.set(true);
     results.set([]);
     const t0 = performance.now();
-    statusLine.replaceChildren(h("span", { class: "status-dot status-dot--run" }), "Running parity cases…");
+    statusLine.replaceChildren(h("span", { class: "status-dot status-dot--run" }), "Running parity cases...");
     const timer = setInterval(() => elapsed.set(performance.now() - t0), 200);
     try {
       const published = await markBusy(

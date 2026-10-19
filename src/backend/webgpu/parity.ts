@@ -1,7 +1,7 @@
 /**
- * Backend-level GPU ↔ CPU parity harness.
+ * Backend-level GPU vs CPU parity harness.
  *
- * For every `Backend` method, random inputs (odd sizes, broadcasting, batch, transposes, duplicate ids …)
+ * For every `Backend` method, random inputs (odd sizes, broadcasting, batch, transposes, duplicate ids ...)
  * are run on both backends and compared. Usable from the browser Tests page and from the Playwright
  * script (`scripts/gpu-parity.mjs`) via {@link runParityAndPublish}, which stores the outcome on
  * `globalThis.__kilnParityDone`.

@@ -58,7 +58,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
       cpuMaxSel,
       h("span", { class: "spacer" }),
       backend ? chip("device", gpuLabel ?? "WebGPU", "ember") : chip("device", "CPU only", "warn"),
-      chip("matmul sizes", `${MATMUL_SIZES[0]}…${MATMUL_SIZES[MATMUL_SIZES.length - 1]}`),
+      chip("matmul sizes", `${MATMUL_SIZES[0]}...${MATMUL_SIZES[MATMUL_SIZES.length - 1]}`),
     ),
     h("div", { class: "stack stack--sm", style: "margin-top:14px" }, prog.el, progLabel),
   ]);
@@ -116,7 +116,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
     const mm = rs.filter((r) => r.group === "matmul");
     const th = chartTheme();
     chart.setData({
-      categories: mm.map((r) => r.size.split("×")[0] ?? r.size),
+      categories: mm.map((r) => r.size.split("x")[0] ?? r.size),
       series: [
         { name: "CPU", color: th.cool, values: mm.map((r) => r.cpu) },
         { name: "WebGPU", color: th.ember, values: mm.map((r) => r.gpu) },
@@ -133,7 +133,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
           h("td", { class: "dim" }, r.size),
           h("td", { class: "num" }, r.cpu === null ? "-" : `${formatMetric(r.cpu, r.unit)} ${r.unit}`),
           h("td", { class: "num", style: r.gpu !== null ? "color:var(--ember-bright)" : "" }, r.gpu === null ? "-" : `${formatMetric(r.gpu, r.unit)} ${r.unit}`),
-          h("td", { class: "num" }, speed === null ? "-" : `${speed.toFixed(1)}×`),
+          h("td", { class: "num" }, speed === null ? "-" : `${speed.toFixed(1)}x`),
           h("td", { class: "num dim" }, `${fmtMs(r.cpuMs)} / ${fmtMs(r.gpuMs)}`),
         );
       }),
@@ -145,7 +145,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
     const p = progress();
     const on = running();
     prog.set(on ? p.frac : p.frac >= 1 ? 1 : 0);
-    progLabel.textContent = on ? `Running… ${p.label}` : p.frac >= 1 ? "Done" : "";
+    progLabel.textContent = on ? `Running... ${p.label}` : p.frac >= 1 ? "Done" : "";
     runBtn.disabled = on;
     stopBtn.style.display = on ? "" : "none";
     cpuCheck.disabled = on;

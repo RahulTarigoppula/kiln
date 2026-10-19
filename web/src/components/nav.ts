@@ -9,7 +9,7 @@ export const ARCH_URL = `${REPO_URL}/blob/main/docs/ARCHITECTURE.md`;
 
 export function deviceBadge(): HTMLElement {
   const dot = h("span", { class: "badge__dot" });
-  const label = h("span", { class: "badge__label" }, "Initialising…");
+  const label = h("span", { class: "badge__label" }, "Initialising...");
   const kind = h("span", { class: "badge__kind" }, "");
   const el = h("div", { class: "badge badge--init", role: "status", "aria-live": "polite" }, dot, label, kind);
   effect(() => {
@@ -29,7 +29,7 @@ export function deviceBadge(): HTMLElement {
       el.title = `${s.error ?? "WebGPU unavailable"}\nTraining, Bench and the parity Tests need WebGPU (Chrome/Edge 113+, Safari 26+, Firefox 141+ on Windows). The Playground and Inspect pages work on the CPU.`;
     } else {
       el.classList.add("badge--init");
-      label.textContent = s.status === "initializing" ? "Requesting GPU…" : "Device";
+      label.textContent = s.status === "initializing" ? "Requesting GPU..." : "Device";
       kind.textContent = "";
     }
   });

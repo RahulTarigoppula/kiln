@@ -187,7 +187,7 @@ export function backward(root: Tensor, grad?: Tensor): void {
       if (!g) continue;
       const fn = t.gradFn;
       if (fn) {
-        // Temporaries created by the closure (dense copies, products, …) die with this scope; returned
+        // Temporaries created by the closure (dense copies, products, ...) die with this scope; returned
         // gradients survive because they are the scope's result.
         beginScope();
         let inGrads: (Tensor | null)[];

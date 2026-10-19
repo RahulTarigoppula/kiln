@@ -3,9 +3,9 @@
  *
  *  - NN / TN share `gemmRows4`: 4 rows of C are accumulated together so every B element loaded in the
  *    inner j loop feeds four FMAs (4-way unroll over i). A is addressed through (rowStride, colStride) so a
- *    K×M-stored (transposed) A costs nothing extra - its four row reads become one contiguous quad.
+ *    KxM-stored (transposed) A costs nothing extra - its four row reads become one contiguous quad.
  *    Tiles: K in blocks of 256, N in blocks of 512 so the 4 live C rows + the B block stay cache-resident.
- *  - NT (B stored N×K) uses a 2×2 register-blocked dot-product kernel: both operands stream along k.
+ *  - NT (B stored NxK) uses a 2x2 register-blocked dot-product kernel: both operands stream along k.
  *  - TT is computed as (Bᵗ·Aᵗ)ᵗ through the NN kernel into a scratch tile, then transposed.
  */
 
@@ -13,8 +13,8 @@ const BK = 256;
 const BN = 512;
 
 /**
- * C[M×N] (row-major, overwritten) = A · B where A[i,k] = A[aOff + i*sAi + k*sAk] and B is K×N row-major.
- * NN: (sAi, sAk) = (K, 1); TN with A stored K×M: (sAi, sAk) = (1, M).
+ * C[MxN] (row-major, overwritten) = A · B where A[i,k] = A[aOff + i*sAi + k*sAk] and B is KxN row-major.
+ * NN: (sAi, sAk) = (K, 1); TN with A stored KxM: (sAi, sAk) = (1, M).
  */
 function gemmRows4(
   A: Float32Array, aOff: number, sAi: number, sAk: number,
@@ -61,7 +61,7 @@ function gemmRows4(
   }
 }
 
-/** C[M×N] = A[M×K] · B[K×N], all row-major; C is overwritten. */
+/** C[MxN] = A[MxK] · B[KxN], all row-major; C is overwritten. */
 export function gemmNN(
   A: Float32Array, aOff: number, B: Float32Array, bOff: number, C: Float32Array, cOff: number,
   M: number, K: number, N: number,
@@ -69,7 +69,7 @@ export function gemmNN(
   gemmRows4(A, aOff, K, 1, B, bOff, C, cOff, M, K, N);
 }
 
-/** C[M×N] = Aᵗ · B where A is stored K×M row-major and B is K×N row-major. */
+/** C[MxN] = Aᵗ · B where A is stored KxM row-major and B is KxN row-major. */
 export function gemmTN(
   A: Float32Array, aOff: number, B: Float32Array, bOff: number, C: Float32Array, cOff: number,
   M: number, K: number, N: number,
@@ -77,7 +77,7 @@ export function gemmTN(
   gemmRows4(A, aOff, 1, M, B, bOff, C, cOff, M, K, N);
 }
 
-/** C[M×N] = A[M×K] · Bᵗ where B is stored N×K row-major (2×2 register-blocked dot products). */
+/** C[MxN] = A[MxK] · Bᵗ where B is stored NxK row-major (2x2 register-blocked dot products). */
 export function gemmNT(
   A: Float32Array, aOff: number, B: Float32Array, bOff: number, C: Float32Array, cOff: number,
   M: number, K: number, N: number,
@@ -137,7 +137,7 @@ export function gemmNT(
   }
 }
 
-/** C[M×N] = Aᵗ · Bᵗ with A stored K×M and B stored N×K: Cᵗ = B·A via gemmNN, then transposed. */
+/** C[MxN] = Aᵗ · Bᵗ with A stored KxM and B stored NxK: Cᵗ = B·A via gemmNN, then transposed. */
 export function gemmTT(
   A: Float32Array, aOff: number, B: Float32Array, bOff: number, C: Float32Array, cOff: number,
   M: number, K: number, N: number,

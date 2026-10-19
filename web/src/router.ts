@@ -1,4 +1,4 @@
-/** Hash router: `#/studio`, `#/playground`, … Each page module exports `mount(root) -> dispose`. */
+/** Hash router: `#/studio`, `#/playground`, ... Each page module exports `mount(root) -> dispose`. */
 import { signal } from "./lib/signals";
 
 export type PageMount = (root: HTMLElement) => void | (() => void) | Promise<void | (() => void)>;
