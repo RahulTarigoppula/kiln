@@ -3,7 +3,7 @@
  *
  *  - NN / TN share `gemmRows4`: 4 rows of C are accumulated together so every B element loaded in the
  *    inner j loop feeds four FMAs (4-way unroll over i). A is addressed through (rowStride, colStride) so a
- *    K×M-stored (transposed) A costs nothing extra — its four row reads become one contiguous quad.
+ *    K×M-stored (transposed) A costs nothing extra - its four row reads become one contiguous quad.
  *    Tiles: K in blocks of 256, N in blocks of 512 so the 4 live C rows + the B block stay cache-resident.
  *  - NT (B stored N×K) uses a 2×2 register-blocked dot-product kernel: both operands stream along k.
  *  - TT is computed as (Bᵗ·Aᵗ)ᵗ through the NN kernel into a scratch tile, then transposed.

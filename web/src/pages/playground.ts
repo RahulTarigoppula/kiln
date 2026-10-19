@@ -1,9 +1,9 @@
-/** Playground — generate from a checkpoint with per-token probability shading. */
+/** Playground - generate from a checkpoint with per-token probability shading. */
 import { h } from "../lib/dom";
 import { Scope, signal } from "../lib/signals";
 import { gpuState } from "../lib/gpu";
 import { fmtCompact, fmtDuration, fmtPercent } from "../lib/format";
-import { generateTokens, isEngineNotWired, type GenerateOptions, type TokenEvent } from "../lib/engine";
+import { generateTokens, type GenerateOptions, type TokenEvent } from "../lib/engine";
 import { checkpoint, model, modelUnavailable } from "../lib/model-store";
 import { checkpointPicker } from "../components/checkpoint-picker";
 import { button, card, chip, field, notice, numberInput, pageHead, slider, toast } from "../components/ui";
@@ -51,7 +51,7 @@ export function mount(root: HTMLElement): () => void {
       h(
         "div",
         { class: "row row--between", style: "margin-top:12px" },
-        h("div", { class: "prob-scale" }, "p(token)", h("span", { class: "prob-scale__bar" }), "low → high · hover a token for the top-5 alternatives"),
+        h("div", { class: "prob-scale" }, "p(token)", h("span", { class: "prob-scale__bar" }), "low to high · hover a token for the top-5 alternatives"),
         statsRow,
       ),
     ],
@@ -110,8 +110,8 @@ export function mount(root: HTMLElement): () => void {
     const un = modelUnavailable();
     noticeHost.replaceChildren();
     noticeHost.style.marginBottom = "12px";
-    if (!ck) noticeHost.appendChild(notice("info", ["Load a checkpoint to start generating. The shipped ", h("code", null, "shakespeare-tiny"), " model is a 4-layer char-level GPT trained on TinyShakespeare."]));
-    else if (!m && un) noticeHost.appendChild(notice("ember", [h("b", null, "Generation needs the phase-2 model engine. "), "The checkpoint is parsed (", String(ck.records.length), " tensors); wire ", h("code", null, "instantiateModel()"), " / ", h("code", null, "generateTokens()"), " in ", h("code", null, "web/src/lib/engine.ts"), " and this page streams tokens."]));
+    if (!ck) noticeHost.appendChild(notice("info", ["Load a checkpoint to start generating. The shipped ", h("code", null, "shakespeare-micro"), " model is a 4-layer char-level GPT trained on TinyShakespeare on WebGPU."]));
+    else if (!m && un) noticeHost.appendChild(notice("warn", [h("b", null, "The checkpoint is parsed but the model could not be built. "), un]));
     else noticeHost.style.marginBottom = "0";
   });
 
@@ -129,7 +129,7 @@ export function mount(root: HTMLElement): () => void {
       return;
     }
     if (!m) {
-      toast(modelUnavailable.peek() ? "Model engine not wired yet (phase 2)" : "Model not ready", "bad");
+      toast(modelUnavailable.peek() ?? "Model not ready", "bad");
       return;
     }
     reset();
@@ -152,7 +152,7 @@ export function mount(root: HTMLElement): () => void {
         stats.set({ tokens: n, ms: performance.now() - t0 });
       }
     } catch (err: unknown) {
-      if (!abort.signal.aborted) toast(isEngineNotWired(err) ? "Model engine not wired yet (phase 2)" : `Generation failed: ${err instanceof Error ? err.message : String(err)}`, "bad");
+      if (!abort.signal.aborted) toast(`Generation failed: ${err instanceof Error ? err.message : String(err)}`, "bad");
     } finally {
       stats.set({ tokens: n, ms: performance.now() - t0 });
       generating.set(false);

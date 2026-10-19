@@ -12,7 +12,7 @@ export interface BenchRow {
   kernel: string;
   size: string;
   unit: "GFLOPS" | "GB/s" | "rows/s";
-  /** Work per call (FLOP, bytes or rows) — metric = work / seconds. */
+  /** Work per call (FLOP, bytes or rows) - metric = work / seconds. */
   work: number;
   cpuMs: number | null;
   gpuMs: number | null;
@@ -186,14 +186,14 @@ export async function runBench(opts: BenchOptions): Promise<BenchRow[]> {
 }
 
 export function formatMetric(v: number | null, unit: BenchRow["unit"]): string {
-  if (v === null || !Number.isFinite(v)) return "—";
+  if (v === null || !Number.isFinite(v)) return "-";
   if (unit === "rows/s") return v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${(v / 1e3).toFixed(1)}k` : v.toFixed(0);
   return v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2);
 }
 
 export function toMarkdown(rows: BenchRow[], adapter: string | null): string {
   const lines = [
-    `## Kiln kernel bench${adapter ? ` — ${adapter}` : ""}`,
+    `## Kiln kernel bench${adapter ? ` - ${adapter}` : ""}`,
     "",
     `Measured in-browser (${navigator.userAgent.includes("Chrome") ? "Chromium" : "browser"}), wall-clock around enqueue + sync. ${new Date().toISOString().slice(0, 10)}.`,
     "",
@@ -201,7 +201,7 @@ export function toMarkdown(rows: BenchRow[], adapter: string | null): string {
     "|---|---|---|---:|---:|---:|",
   ];
   for (const r of rows) {
-    const speed = r.cpu !== null && r.gpu !== null && r.cpu > 0 ? `${(r.gpu / r.cpu).toFixed(1)}×` : "—";
+    const speed = r.cpu !== null && r.gpu !== null && r.cpu > 0 ? `${(r.gpu / r.cpu).toFixed(1)}×` : "-";
     lines.push(`| ${r.kernel} | ${r.size} | ${r.unit} | ${formatMetric(r.cpu, r.unit)} | ${formatMetric(r.gpu, r.unit)} | ${speed} |`);
   }
   return lines.join("\n");

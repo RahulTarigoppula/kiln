@@ -37,7 +37,7 @@ export class CausalSelfAttention extends Module {
   readonly headDim: number;
   readonly blockSize: number;
   readonly dropout: number;
-  /** Fused query/key/value projection `[nEmbd → 3·nEmbd]`. */
+  /** Fused query/key/value projection `[nEmbd -> 3·nEmbd]`. */
   c_attn: Linear;
   /** Output projection. */
   c_proj: Linear;
@@ -70,7 +70,7 @@ export class CausalSelfAttention extends Module {
     if (this.mask === from) this.mask = to;
   }
 
-  /** x: [B, T, nEmbd] → [B, T, nEmbd]. */
+  /** x: [B, T, nEmbd] -> [B, T, nEmbd]. */
   forward(x: Tensor): Tensor {
     const [B, T, C] = x.shape as [number, number, number];
     if (T > this.blockSize) throw new Error(`CausalSelfAttention: sequence length ${T} exceeds blockSize ${this.blockSize}`);

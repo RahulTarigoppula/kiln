@@ -19,7 +19,7 @@ let singleton: Promise<WebGpuBackend | null> | null = null;
 
 /**
  * Create (once) the WebGPU backend and register it under the name `"webgpu"`.
- * Resolves to `null` — without throwing — when WebGPU is unavailable or device creation fails.
+ * Resolves to `null` - without throwing - when WebGPU is unavailable or device creation fails.
  */
 export function initWebGpu(opts: WebGpuBackendOptions = {}, register: RegisterBackendFn = registerBackend): Promise<WebGpuBackend | null> {
   if (singleton) return singleton;

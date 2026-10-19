@@ -1,4 +1,4 @@
-/** Tests — in-browser GPU ↔ CPU parity suite (`runParityAndPublish` → window.__kilnParityDone). */
+/** Tests - in-browser GPU ↔ CPU parity suite (`runParityAndPublish` -> window.__kilnParityDone). */
 import { runParityAndPublish, type ParityResult } from "../../../src/backend/webgpu/parity";
 import { h, svg, icons, KILN_MARK } from "../lib/dom";
 import { Scope, signal } from "../lib/signals";
@@ -104,10 +104,10 @@ export async function mount(root: HTMLElement): Promise<() => void> {
           "tr",
           { class: r.pass ? "" : "is-fail", title: r.error ?? `${r.op} · ${r.case}` },
           h("td", { class: "op" }, r.op),
-          h("td", { class: "dim" }, r.error ? `${r.case} — ${r.error}` : r.case),
+          h("td", { class: "dim" }, r.error ? `${r.case} - ${r.error}` : r.case),
           h("td", { class: "num" }, fmtErr(r.maxAbs)),
           h("td", { class: "num" }, fmtErr(r.maxRel)),
-          h("td", { class: "num dim" }, r.threshold ? r.threshold.toExponential(0) : "—"),
+          h("td", { class: "num dim" }, r.threshold ? r.threshold.toExponential(0) : "-"),
           h("td", { class: "num dim" }, r.ms.toFixed(1)),
           h("td", null, h("span", { class: `pass-pill ${r.pass ? "pass-pill--ok" : "pass-pill--bad"}` }, svg(r.pass ? icons.check : icons.warn), r.pass ? "PASS" : "FAIL")),
         ),
@@ -183,7 +183,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
 }
 
 function fmtErr(v: number): string {
-  if (!Number.isFinite(v)) return "—";
+  if (!Number.isFinite(v)) return "-";
   if (v === 0) return "0";
   return v.toExponential(2);
 }
@@ -199,7 +199,7 @@ function unavailableState(apiPresent: boolean, error: string | null): HTMLElemen
         "p",
         { class: "prose", style: "margin:0" },
         apiPresent
-          ? "navigator.gpu exists but no adapter could be created — the GPU driver may be blocked, or hardware acceleration is disabled in this browser."
+          ? "navigator.gpu exists but no adapter could be created - the GPU driver may be blocked, or hardware acceleration is disabled in this browser."
           : "This browser does not expose navigator.gpu. The parity suite compares the WebGPU kernels against the CPU backend, so it needs a WebGPU-capable browser.",
       ),
       h(

@@ -19,7 +19,7 @@ import {
 export interface GPTCheckpointExtra {
   /** Training step the checkpoint was taken at. */
   step?: number;
-  /** alias name → canonical name for tied parameters. */
+  /** alias name -> canonical name for tied parameters. */
   tied?: Record<string, string>;
   /** Optimizer hyper-parameters when `optim.*` records are present. */
   optimizer?: { type: string; step: number; defaults: Record<string, number>; groups: { size: number; hyper: Record<string, number> }[] };
@@ -88,7 +88,7 @@ export async function saveGPT(model: GPT, tokenizer: unknown, trainingLog: Train
   return { bytes, meta };
 }
 
-/** Records → CPU tensors keyed by name (model records only, `optim.*` excluded). */
+/** Records -> CPU tensors keyed by name (model records only, `optim.*` excluded). */
 export function recordsToStateDict(records: readonly TensorRecord[]): StateDict {
   const sd: StateDict = new Map();
   for (const r of records) {

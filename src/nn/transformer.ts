@@ -22,7 +22,7 @@ export interface BlockOptions {
   device?: Device;
 }
 
-/** Feed-forward network: Linear(4×) → GELU → Linear → Dropout. */
+/** Feed-forward network: Linear(4×) -> GELU -> Linear -> Dropout. */
 export class MLP extends Module {
   c_fc: Linear;
   gelu: GELU;
@@ -61,7 +61,7 @@ export class Block extends Module {
     this.mlp = this.child("mlp", new MLP(opts));
   }
 
-  /** x: [B, T, nEmbd] → same shape. */
+  /** x: [B, T, nEmbd] -> same shape. */
   forward(x: Tensor): Tensor {
     const h = x.add(this.attn.forward(this.ln_1.forward(x)));
     return h.add(this.mlp.forward(this.ln_2.forward(h)));

@@ -208,7 +208,7 @@ describe("Module", () => {
     expect(names).toContain("transformer.h.0.attn.c_attn.weight");
     expect(names).toContain("transformer.h.1.mlp.c_proj.bias");
     expect(names).toContain("transformer.ln_f.bias");
-    expect(names).not.toContain("lm_head.weight"); // tied → counted once
+    expect(names).not.toContain("lm_head.weight"); // tied -> counted once
     expect(gpt.lm_head.weight).toBe(gpt.transformer.wte.weight);
     const sd = gpt.stateDict();
     expect(sd.get("lm_head.weight")).toBe(sd.get("transformer.wte.weight"));

@@ -37,7 +37,7 @@ export class LayerNorm extends Module {
     }
   }
 
-  /** x: [..., dim] → same shape. */
+  /** x: [..., dim] -> same shape. */
   forward(x: Tensor): Tensor {
     return x.layerNorm(this.weight, this.bias ?? (this.zeroBias as Tensor), this.eps);
   }

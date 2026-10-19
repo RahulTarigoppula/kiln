@@ -713,7 +713,7 @@ export interface HeatmapData {
   yTitle?: string;
 }
 
-/** Ember colormap: near-black → deep ember → ember → pale gold. */
+/** Ember colormap: near-black -> deep ember -> ember -> pale gold. */
 export function emberColor(t: number): string {
   const x = Math.min(1, Math.max(0, t));
   const stops: [number, [number, number, number]][] = [
@@ -862,7 +862,7 @@ export class Heatmap extends CanvasChart {
     const v = d.values[cell.r * d.cols + cell.c] ?? 0;
     const q = d.yLabels?.[cell.r] ?? String(cell.r);
     const k = d.xLabels?.[cell.c] ?? String(cell.c);
-    return { title: `query ${q} → key ${k}`, rows: [{ label: "weight", value: v.toFixed(4) }] };
+    return { title: `query ${q} -> key ${k}`, rows: [{ label: "weight", value: v.toFixed(4) }] };
   }
 }
 

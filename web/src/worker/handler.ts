@@ -1,6 +1,6 @@
 /**
- * Training session handler — shared by `train.worker.ts` (Web Worker) and the main-thread fallback.
- * Owns the lifecycle: init backend → build tokenizer/dataset → create trainer → stream events.
+ * Training session handler - shared by `train.worker.ts` (Web Worker) and the main-thread fallback.
+ * Owns the lifecycle: init backend -> build tokenizer/dataset -> create trainer -> stream events.
  */
 import type { Device } from "../../../src/backend/types";
 import { initWebGpu } from "../../../src/backend/webgpu/register";
@@ -134,7 +134,7 @@ export function createTrainHandler(post: PostEvent, inWorker: boolean): TrainHan
 
   async function generate(id: number, prompt: string, opts: GenerateOptions): Promise<void> {
     if (!trainer || !tokenizer) {
-      post({ type: "error", message: "Start training first — the in-training model is what gets sampled." });
+      post({ type: "error", message: "Start training first - the in-training model is what gets sampled." });
       post({ type: "generated", id });
       return;
     }

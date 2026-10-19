@@ -1,7 +1,7 @@
 /**
  * Memory scopes ("tidy"): automatic freeing of intermediate tensors.
  *
- * Kiln has no garbage collector for device buffers — `Storage` is refcounted and a buffer is returned to the
+ * Kiln has no garbage collector for device buffers - `Storage` is refcounted and a buffer is returned to the
  * backend only when every `Tensor` handle referencing it has called `free()`. Ops create many intermediates
  * (dense copies, mask tensors, saved activations, gradient temporaries), so a training step would leak GPU
  * memory without help. A scope fixes that:
@@ -12,7 +12,7 @@
  * frees all tracked tensors except
  *   - tensors returned from `fn` (a Tensor, or any array/object nesting of Tensors),
  *   - tensors explicitly marked with `keep(t)`,
- *   - tensors reachable from a kept tensor's (unreleased) autograd graph — so `tidy(() => model.forward(x))`
+ *   - tensors reachable from a kept tensor's (unreleased) autograd graph - so `tidy(() => model.forward(x))`
  *     followed by `backward()` outside the scope is still safe,
  *   - tensors removed from scope tracking with `escape(t)`: parameters, buffers, optimizer state and
  *     gradients stored on leaves are escaped automatically by `Module`, the optimisers and `backward()`.
@@ -76,7 +76,7 @@ function collect(value: unknown, out: Set<Tensor>, depth: number): void {
   }
   if (typeof value === "object") {
     if (typeof (value as { then?: unknown }).then === "function") {
-      throw new Error("tidy(): the callback returned a Promise; scopes are synchronous — wrap the sync parts in tidy() separately");
+      throw new Error("tidy(): the callback returned a Promise; scopes are synchronous - wrap the sync parts in tidy() separately");
     }
     const proto = Object.getPrototypeOf(value) as unknown;
     if (proto === Object.prototype || proto === null) {

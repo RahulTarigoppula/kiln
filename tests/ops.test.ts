@@ -120,7 +120,7 @@ describe("arithmetic", () => {
     expectClose(a.pow(2), [1, 4, 9, 16, 25, 36]);
     expectClose(ops.pow(2, tensor([0, 1, 3])), [1, 2, 8]);
     expectClose(tensor([2, 3]).pow(tensor([3, 2])), [8, 9]);
-    // [2,1] + [1,3] → [2,3]
+    // [2,1] + [1,3] -> [2,3]
     expectClose(tensor([[1], [2]]).add(tensor([[10, 20, 30]])), [11, 21, 31, 12, 22, 32], [2, 3]);
     // scalar tensor broadcast
     expectClose(a.mul(tensor(2)), [2, 4, 6, 8, 10, 12]);
@@ -131,7 +131,7 @@ describe("arithmetic", () => {
     const at = a.transpose(); // [3,2] strides [1,3]
     expectClose(at.add(tensor([100, 200])), [101, 204, 102, 205, 103, 206], [3, 2]);
     expectClose(at.mul(at), [1, 16, 4, 25, 9, 36]);
-    const sl = arange(10).slice(0, 2, 8, 2); // offset 2 → must materialise
+    const sl = arange(10).slice(0, 2, 8, 2); // offset 2 -> must materialise
     expectClose(sl.add(1), [3, 5, 7]);
     expectClose(sl.add(sl), [4, 8, 12]);
   });
@@ -272,7 +272,7 @@ describe("matmul", () => {
       const ref = refMatmul(ad.subarray(i * 12, i * 12 + 12), bd.subarray(i * 20, i * 20 + 20), 3, 4, 5);
       expectClose(out.slice(0, i, i + 1).squeeze(0), ref, [3, 5], 1e-4);
     }
-    // [2,1,3,4] @ [1,3,4,5] → [2,3,3,5]
+    // [2,1,3,4] @ [1,3,4,5] -> [2,3,3,5]
     const A2 = A.unsqueeze(1);
     const B2 = Tensor.randn([3, 4, 5], { seed: 5 }).unsqueeze(0);
     const out2 = A2.matmul(B2);

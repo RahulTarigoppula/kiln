@@ -1,7 +1,7 @@
 /**
  * Autograd graph: grad-mode flag, `Node` (a recorded backward function) and the reverse-mode engine.
  *
- * Memory: `backward()` frees what it can as it goes — each node's owned `saved` tensors (via `release()`),
+ * Memory: `backward()` frees what it can as it goes - each node's owned `saved` tensors (via `release()`),
  * temporaries created inside backward closures (an internal scope per node), and the gradients of non-leaf
  * tensors once they have been propagated. Gradients stored on leaves are `escape`d from any enclosing
  * `tidy` scope: the leaf owns them (`zeroGrad()` frees them, accumulation frees the replaced grad).

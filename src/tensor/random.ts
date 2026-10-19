@@ -10,7 +10,7 @@
  *        hash(seed, i)     : splitmix32(seed ^ (i * 0x9E3779B9))
  *        uniform(seed, i)  : (hash(seed, i) >>> 8) / 16777216        in [0, 1)
  *        normal(seed, i)   : j = i & ~1; u1 = uniform(seed, j); u2 = uniform(seed, j | 1)
- *                            r = sqrt(-2 ln(1 - u1)); t = 2π u2;  even i → r cos t, odd i → r sin t
+ *                            r = sqrt(-2 ln(1 - u1)); t = 2π u2;  even i -> r cos t, odd i -> r sin t
  *        dropoutMask(i)    : uniform(seed, i) < p ? 0 : 1
  */
 
@@ -40,7 +40,7 @@ export function hashUniform(seed: number, i: number): number {
   return (hashU32(seed, i) >>> 8) / 16777216;
 }
 
-/** Counter-based standard normal (Box–Muller over the pair (i & ~1, i | 1)). */
+/** Counter-based standard normal (Box - Muller over the pair (i & ~1, i | 1)). */
 export function hashNormal(seed: number, i: number): number {
   const j = i & ~1;
   const u1 = hashUniform(seed, j);
@@ -101,7 +101,7 @@ export class Random {
     return lo + (hi - lo) * this.uniform();
   }
 
-  /** Standard normal via Box–Muller (second sample cached). */
+  /** Standard normal via Box - Muller (second sample cached). */
   normal(): number {
     if (this.spare !== null) {
       const v = this.spare;
@@ -121,7 +121,7 @@ export class Random {
     return Math.floor(this.uniform() * n);
   }
 
-  /** In-place Fisher–Yates shuffle. */
+  /** In-place Fisher - Yates shuffle. */
   shuffle<T>(arr: T[]): T[] {
     for (let i = arr.length - 1; i > 0; i--) {
       const j = this.int(i + 1);

@@ -1,4 +1,4 @@
-/** Hash router: `#/studio`, `#/playground`, … Each page module exports `mount(root) → dispose`. */
+/** Hash router: `#/studio`, `#/playground`, … Each page module exports `mount(root) -> dispose`. */
 import { signal } from "./lib/signals";
 
 export type PageMount = (root: HTMLElement) => void | (() => void) | Promise<void | (() => void)>;
@@ -53,7 +53,7 @@ export function startRouter(outlet: HTMLElement): void {
     outlet.replaceChildren();
     outlet.scrollTop = 0;
     window.scrollTo({ top: 0 });
-    document.title = route ? `${route.title} — Kiln` : "Kiln";
+    document.title = route ? `${route.title} - Kiln` : "Kiln";
     if (!route) {
       outlet.appendChild(notFound(path));
       return;

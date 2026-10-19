@@ -36,7 +36,7 @@ export class Linear extends Module {
     this.bias = (opts.bias ?? true) ? this.param("bias", zeros([outFeatures], { device: opts.device })) : null;
   }
 
-  /** x: [..., inFeatures] → [..., outFeatures]. */
+  /** x: [..., inFeatures] -> [..., outFeatures]. */
   forward(x: Tensor): Tensor {
     const y = x.matmul(this.weight.transpose(0, 1));
     return this.bias ? y.add(this.bias) : y;

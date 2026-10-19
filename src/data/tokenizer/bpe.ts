@@ -14,7 +14,7 @@
 export interface BpeJSON {
   type: "bpe";
   version: 1;
-  /** token string (byte-character alphabet) → id, including special tokens. */
+  /** token string (byte-character alphabet) -> id, including special tokens. */
   vocab: Record<string, number>;
   /** Merge rules in rank order, each as "left right". */
   merges: string[];
@@ -43,7 +43,7 @@ export const GPT2_PRETOKENIZE_PATTERN = /'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N
 /** Default end-of-text special token. */
 export const ENDOFTEXT = "<|endoftext|>";
 
-/** Byte order used by GPT-2 for ids 0..255, and the byte → character map. */
+/** Byte order used by GPT-2 for ids 0..255, and the byte -> character map. */
 function buildByteMaps(): { byteOrder: number[]; byteToChar: string[]; charToByte: Map<string, number> } {
   const bs: number[] = [];
   for (let b = 33; b <= 126; b++) bs.push(b);
@@ -96,7 +96,7 @@ export class ByteLevelBPE {
   private readonly cache = new Map<string, number[]>();
 
   /**
-   * @param vocab token → id (must include the 256 byte characters)
+   * @param vocab token -> id (must include the 256 byte characters)
    * @param merges "left right" rules in rank order
    * @param specialTokens special-token strings present in `vocab`
    */

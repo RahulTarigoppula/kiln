@@ -24,6 +24,8 @@ export function sizeClass(bytes: number): number {
 export interface PoolStats {
   /** Bytes currently handed out to callers. */
   liveBytes: number;
+  /** Number of buffers currently handed out to callers. */
+  liveBuffers: number;
   /** Bytes sitting idle in the pool. */
   pooledBytes: number;
   /** Total `createBuffer` calls. */
@@ -34,6 +36,7 @@ export interface PoolStats {
 export class BufferPool {
   private readonly free = new Map<number, GPUBuffer[]>();
   private liveBytes = 0;
+  private liveBuffers = 0;
   private pooledBytes = 0;
   private created = 0;
   /** Idle bytes allowed before extra freed buffers are destroyed instead of pooled. */
@@ -57,6 +60,7 @@ export class BufferPool {
       this.created++;
     }
     this.liveBytes += size;
+    this.liveBuffers++;
     return buf;
   }
 
@@ -64,6 +68,7 @@ export class BufferPool {
   release(buf: GPUBuffer): void {
     const size = buf.size;
     this.liveBytes -= size;
+    this.liveBuffers--;
     if (this.pooledBytes + size > this.maxPooledBytes) {
       buf.destroy();
       return;
@@ -85,7 +90,7 @@ export class BufferPool {
   }
 
   stats(): PoolStats {
-    return { liveBytes: this.liveBytes, pooledBytes: this.pooledBytes, created: this.created };
+    return { liveBytes: this.liveBytes, liveBuffers: this.liveBuffers, pooledBytes: this.pooledBytes, created: this.created };
   }
 }
 

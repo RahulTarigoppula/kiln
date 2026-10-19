@@ -12,7 +12,7 @@ import type { Device } from "../backend/types";
 import { Tensor } from "../tensor/tensor";
 import { escape } from "../tensor/scope";
 
-/** A state dict: dotted name → tensor (parameters first, then persistent buffers). */
+/** A state dict: dotted name -> tensor (parameters first, then persistent buffers). */
 export type StateDict = Map<string, Tensor>;
 
 /** Result of {@link Module.loadStateDict}. */
@@ -73,7 +73,7 @@ export class Module {
 
   // ------------------------------------------------------------------ enumeration
 
-  /** Own parameters (name → tensor): registered ones, then auto-discovered requires-grad tensor properties. */
+  /** Own parameters (name -> tensor): registered ones, then auto-discovered requires-grad tensor properties. */
   ownParameters(): Map<string, Tensor> {
     const out = new Map<string, Tensor>(this._params);
     const seen = new Set(out.values());
@@ -86,14 +86,14 @@ export class Module {
     return out;
   }
 
-  /** Own buffers (name → tensor). */
+  /** Own buffers (name -> tensor). */
   ownBuffers(persistentOnly = false): Map<string, Tensor> {
     const out = new Map<string, Tensor>();
     for (const [k, e] of this._buffers) if (!persistentOnly || e.persistent) out.set(k, e.tensor);
     return out;
   }
 
-  /** Direct children (name → module): registered ones, then Module / Module[] properties. */
+  /** Direct children (name -> module): registered ones, then Module / Module[] properties. */
   namedChildren(): Map<string, Module> {
     const out = new Map<string, Module>(this._children);
     const seen = new Set(out.values());
@@ -135,7 +135,7 @@ export class Module {
     return this.namedModules().map(([, m]) => m);
   }
 
-  /** Dotted parameter names → tensors over the whole tree, each tensor listed once (first name wins). */
+  /** Dotted parameter names -> tensors over the whole tree, each tensor listed once (first name wins). */
   namedParameters(): [string, Tensor][] {
     const out: [string, Tensor][] = [];
     const seen = new Set<Tensor>();
@@ -154,7 +154,7 @@ export class Module {
     return this.namedParameters().map(([, t]) => t);
   }
 
-  /** Dotted buffer names → tensors over the whole tree. */
+  /** Dotted buffer names -> tensors over the whole tree. */
   namedBuffers(persistentOnly = false): [string, Tensor][] {
     const out: [string, Tensor][] = [];
     for (const [prefix, m] of this.namedModules()) {
@@ -179,7 +179,7 @@ export class Module {
 
   /**
    * Parameters and persistent buffers by dotted name. Tied parameters appear under every name (PyTorch
-   * semantics) — `io.ts` deduplicates them when writing safetensors.
+   * semantics) - `io.ts` deduplicates them when writing safetensors.
    */
   stateDict(): StateDict {
     const sd: StateDict = new Map();
@@ -192,7 +192,7 @@ export class Module {
 
   /**
    * Copy tensors from `source` into this module's parameters/buffers (in place, shapes must match).
-   * In strict mode a missing or unexpected key throws — except a tied parameter whose tensor was already
+   * In strict mode a missing or unexpected key throws - except a tied parameter whose tensor was already
    * loaded under another name.
    */
   loadStateDict(source: StateDict | Record<string, Tensor>, strict = true): LoadResult {
@@ -236,7 +236,7 @@ export class Module {
   }
 
   /**
-   * Move every parameter and buffer to `device` (CPU → device only; returns `this`). Tied tensors stay tied.
+   * Move every parameter and buffer to `device` (CPU -> device only; returns `this`). Tied tensors stay tied.
    * Properties holding a moved tensor are rebound so `this.weight` keeps working.
    */
   to(device: Device): this {

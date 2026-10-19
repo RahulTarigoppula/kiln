@@ -74,7 +74,7 @@ describe("tidy", () => {
       const r = tidy(() => ({ x: a.add(1), ys: [a.add(2), a.add(3)], n: 42 }));
       expect(r.x.isFreed).toBe(false);
       expect(counting.live.size).toBe(base + 3);
-      return r.ys[1] as Tensor; // x and ys[0] belong to the outer scope now → freed here
+      return r.ys[1] as Tensor; // x and ys[0] belong to the outer scope now -> freed here
     });
     expect(counting.live.size).toBe(base + 1);
     outer.free();

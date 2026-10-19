@@ -1,6 +1,6 @@
 /**
  * AdamW with decoupled weight decay, bias-corrected (PyTorch semantics), using the backend's fused kernel
- * — one dispatch per parameter per step.
+ * - one dispatch per parameter per step.
  */
 import { Tensor } from "../tensor/tensor";
 import type { Module } from "../nn/module";

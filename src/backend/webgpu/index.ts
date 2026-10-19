@@ -100,6 +100,12 @@ export function collapseDims(shape: readonly number[], strideSets: readonly (rea
   return { shape: outShape, strides: outStrides };
 }
 
+/** Largest divisor of `n` in [2, 128] that leaves at least 8 rows per chunk (1 when none exists, e.g. primes). */
+export function pickChunks(n: number): number {
+  for (let c = Math.min(128, Math.floor(n / 8)); c >= 2; c--) if (n % c === 0) return c;
+  return 1;
+}
+
 /** The WebGPU backend. Create with {@link createWebGpuBackend}. */
 export class WebGpuBackend implements Backend {
   readonly device: Device = "webgpu";
@@ -334,6 +340,26 @@ export class WebGpuBackend implements Backend {
       return;
     }
     if (kept.length > K.MAX_RANK || red.length > K.MAX_RANK) throw new Error("reduce: too many dimension groups");
+    // Leading-axis reductions (bias gradients: [B*T, C] summed over rows) would otherwise run one thread per
+    // output column over the whole reduced extent. Split the reduced group into chunks that become an extra
+    // kept dimension, then reduce the [chunks, outN] partials: ~chunks times more parallelism, exact same
+    // per-element work, only the summation order changes.
+    const lead = red[0];
+    if (red.length === 1 && lead && lead.size >= 512 && kept.length + 1 <= K.MAX_RANK && outN < 4096) {
+      const chunks = pickChunks(lead.size);
+      if (chunks > 1) {
+        const rowsPerChunk = lead.size / chunks;
+        const part = this.pool.alloc(chunks * outN * WORD_BYTES);
+        this.reduceGeneral(op, this.h(a), [{ size: chunks, stride: rowsPerChunk * lead.stride }, ...kept], [{ size: rowsPerChunk, stride: lead.stride }], chunks * outN, rowsPerChunk, part);
+        this.reduceGeneral(op, part, kept.map((g, i) => ({ size: g.size, stride: kept.slice(i + 1).reduce((s, k) => s * k.size, 1) })), [{ size: chunks, stride: outN }], outN, chunks, this.h(out));
+        this.batch.deferRelease(part);
+        return;
+      }
+    }
+    this.reduceGeneral(op, this.h(a), kept, red, outN, redN, this.h(out));
+  }
+
+  private reduceGeneral(op: ReduceOp, a: GPUBuffer, kept: { size: number; stride: number }[], red: { size: number; stride: number }[], outN: number, redN: number, out: GPUBuffer): void {
     this.u32.fill(0, 0, 36);
     this.u32[0] = outN;
     this.u32[1] = redN;
@@ -347,7 +373,7 @@ export class WebGpuBackend implements Backend {
       this.u32[20 + i] = g.size;
       this.u32[28 + i] = g.stride;
     });
-    this.run(this.builder(`reduce_general_${op}`, () => K.reduceGeneralKernel(op, this.wg)), [this.h(a), this.h(out)], 36, this.grid(outN));
+    this.run(this.builder(`reduce_general_${op}`, () => K.reduceGeneralKernel(op, this.wg)), [a, out], 36, this.grid(outN));
   }
 
   private reduceRows(op: ReduceOp, a: GPUBuffer, rows: number, cols: number, out: GPUBuffer): void {

@@ -2,7 +2,7 @@
  * Broadcasting binary kernel (rank ≤ 6). The output index is decomposed over `shape`; input offsets are
  * `Σ idx[d] * strides[d]` with stride 0 for broadcast dimensions. Comparisons write 1.0 / 0.0.
  *
- * Uniform layout (words): [n, rank, 0, 0, shape(8), aStrides(8), bStrides(8)] — 28 words.
+ * Uniform layout (words): [n, rank, 0, 0, shape(8), aStrides(8), bStrides(8)] - 28 words.
  */
 
 import type { BinaryOp } from "../../types";

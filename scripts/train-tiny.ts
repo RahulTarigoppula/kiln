@@ -99,7 +99,7 @@ async function main(): Promise<void> {
     if (presetArg !== "auto" && c.name !== presetArg) continue;
     const ms = calibrate(c, probe, tok.vocabSize);
     const projected = Math.floor((budgetMs - elapsed()) / ms);
-    log(`candidate ${c.name} (L${c.nLayer} H${c.nHead} C${c.nEmbd} T${c.blockSize} B${c.batchSize}): ${ms.toFixed(0)} ms/step → ~${projected} steps in budget`);
+    log(`candidate ${c.name} (L${c.nLayer} H${c.nHead} C${c.nEmbd} T${c.blockSize} B${c.batchSize}): ${ms.toFixed(0)} ms/step -> ~${projected} steps in budget`);
     if (projected >= c.minSteps || presetArg !== "auto") {
       chosen = c;
       msPerStep = ms;

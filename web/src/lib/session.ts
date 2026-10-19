@@ -37,7 +37,7 @@ export class TrainSession {
       const msg = ev.data;
       if (msg.type === "ready" && this.mode === "starting") {
         if (msg.device === "cpu" && pageHasGpu && this.preferGpu) {
-          // WebGPU missing inside workers (non-Chromium) → train on the main thread instead.
+          // WebGPU missing inside workers (non-Chromium) -> train on the main thread instead.
           this.worker?.terminate();
           this.worker = null;
           this.useMainThread();

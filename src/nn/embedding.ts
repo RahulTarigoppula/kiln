@@ -26,7 +26,7 @@ export class Embedding extends Module {
     this.weight = this.param("weight", normal([numEmbeddings, dim], 0, opts.std ?? 0.02, { device: opts.device }));
   }
 
-  /** ids: i32 [...] → [..., dim]. */
+  /** ids: i32 [...] -> [..., dim]. */
   forward(ids: Tensor): Tensor {
     return this.weight.embedding(ids);
   }

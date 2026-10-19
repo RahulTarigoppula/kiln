@@ -3,7 +3,7 @@
  *
  * Layout: `u64 LE header length` + JSON header (padded with spaces to a multiple of 8 bytes) + raw tensor
  * bytes. The header maps each tensor name to `{dtype, shape, data_offsets: [start, end]}` (offsets relative
- * to the data section) and may hold `__metadata__` (string → string).
+ * to the data section) and may hold `__metadata__` (string -> string).
  *
  * Kiln writes a sidecar `.json` next to the `.safetensors` file ({@link KilnCheckpointMeta}) with the model
  * config, tokenizer and training log.
@@ -119,8 +119,12 @@ export function parseSafetensors(input: Uint8Array | ArrayBuffer): ParsedSafeten
     if (!(dtype in BYTES_PER_ELEMENT)) throw new Error(`parseSafetensors: unsupported dtype ${e.dtype} for "${name}"`);
     const numel = e.shape.reduce((a, b) => a * b, 1);
     if (numel * BYTES_PER_ELEMENT[dtype] !== eEnd - s) throw new Error(`parseSafetensors: size mismatch for "${name}"`);
-    const slice = bytes.slice(dataStart + s, dataStart + eEnd); // copy → aligned buffer
-    const data = dtype === "F32" ? new Float32Array(slice.buffer, 0, numel) : new Int32Array(slice.buffer, 0, numel);
+    // Copy into a fresh, aligned ArrayBuffer. `ArrayBuffer.prototype.slice` is used on purpose: a Node `Buffer`
+    // overrides `Uint8Array.prototype.slice` to return a *view* into its shared pool, so `bytes.slice(...).buffer`
+    // would be the pool and offset 0 would read someone else's bytes.
+    const begin = bytes.byteOffset + dataStart + s;
+    const copy = bytes.buffer.slice(begin, begin + (eEnd - s));
+    const data = dtype === "F32" ? new Float32Array(copy, 0, numel) : new Int32Array(copy, 0, numel);
     records.push({ name, dtype, shape: [...e.shape], data });
   }
   metadata = Object.freeze({ ...metadata });
@@ -153,7 +157,7 @@ export function sidecarUrl(url: string): string {
 /** Fetch a checkpoint (and its sidecar when present) in the browser or any `fetch`-capable runtime. */
 export async function fetchCheckpoint(url: string, opts: { metaUrl?: string; signal?: AbortSignal } = {}): Promise<FetchedCheckpoint> {
   const res = await fetch(url, { signal: opts.signal });
-  if (!res.ok) throw new Error(`fetchCheckpoint: ${url} → HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`fetchCheckpoint: ${url} -> HTTP ${res.status}`);
   const parsed = parseSafetensors(new Uint8Array(await res.arrayBuffer()));
   let meta: KilnCheckpointMeta | null = null;
   const metaUrl = opts.metaUrl ?? sidecarUrl(url);

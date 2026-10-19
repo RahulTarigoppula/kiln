@@ -66,6 +66,21 @@ describe("safetensors", () => {
     }
   });
 
+  it("parses a Uint8Array view with a non-zero byteOffset (Node Buffer pool) correctly", () => {
+    const rec: TensorRecord = { name: "w", dtype: "F32", shape: [3], data: Float32Array.from([1.5, -2, 3.25]) };
+    const bytes = serializeSafetensors([rec]);
+    // Embed the file at an odd offset inside a larger buffer, as Node's Buffer pool does.
+    const pool = new Uint8Array(bytes.length + 13);
+    pool.fill(0x7d);
+    pool.set(bytes, 13);
+    const view = pool.subarray(13);
+    const parsed = parseSafetensors(view);
+    expect(Array.from(parsed.records[0]!.data)).toEqual([1.5, -2, 3.25]);
+    // Buffer.slice returns a view; the parser must not depend on Uint8Array.prototype.slice copying.
+    const buf = Buffer.concat([Buffer.alloc(7, 0x7d), Buffer.from(bytes)]).subarray(7);
+    expect(Array.from(parseSafetensors(buf).records[0]!.data)).toEqual([1.5, -2, 3.25]);
+  });
+
   it("rejects malformed inputs", () => {
     expect(() => parseSafetensors(new Uint8Array(4))).toThrow();
     expect(() =>

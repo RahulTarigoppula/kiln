@@ -1,5 +1,5 @@
 /**
- * Stochastic gradient descent with momentum, Nesterov and (coupled) weight decay — PyTorch semantics.
+ * Stochastic gradient descent with momentum, Nesterov and (coupled) weight decay - PyTorch semantics.
  */
 import type { Tensor } from "../tensor/tensor";
 import { tidy } from "../tensor/scope";

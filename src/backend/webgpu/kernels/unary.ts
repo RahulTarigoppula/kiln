@@ -2,7 +2,7 @@
  * Elementwise unary kernel: `out[i] = op(a[i])` with optional scalars `alpha`/`beta` in the uniform.
  *
  * Backward-helper semantics (match `src/backend/cpu/elementwise.ts`): every *Grad op takes the forward
- * *input* x — `tanhGrad(x) = 1 - tanh(x)²`, `sigmoidGrad(x) = σ(x)(1 - σ(x))`, `geluGrad(x)`, `reluGrad(x)`.
+ * *input* x - `tanhGrad(x) = 1 - tanh(x)²`, `sigmoidGrad(x) = σ(x)(1 - σ(x))`, `geluGrad(x)`, `reluGrad(x)`.
  *
  * Uniform layout (words): [n: u32, alpha: f32, beta: f32, pad].
  */

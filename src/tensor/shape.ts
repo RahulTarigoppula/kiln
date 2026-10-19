@@ -55,7 +55,7 @@ export function broadcastShapesN(shapes: Shape[]): number[] {
 
 /**
  * Strides to read a tensor of `shape`/`strides` as if it had `outShape` (which it must broadcast to).
- * Broadcast dimensions (size 1 → size > 1, and newly prepended dimensions) get stride 0.
+ * Broadcast dimensions (size 1 -> size > 1, and newly prepended dimensions) get stride 0.
  */
 export function broadcastStrides(shape: Shape, strides: Shape, outShape: Shape): number[] {
   const nd = outShape.length;

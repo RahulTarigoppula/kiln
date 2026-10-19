@@ -1,4 +1,4 @@
-/** Studio — configure a dataset / tokenizer / GPT preset and train live in a Web Worker. */
+/** Studio - configure a dataset / tokenizer / GPT preset and train live in a Web Worker. */
 import { h } from "../lib/dom";
 import { batch, Scope, signal } from "../lib/signals";
 import { LineChart, chartTheme } from "../lib/charts";
@@ -78,14 +78,17 @@ export async function mount(root: HTMLElement): Promise<() => void> {
         else busyFlag(false);
         if (ev.state === "done") status.set({ message: "Training complete", progress: 1 });
         if (ev.state === "stopped") status.set({ message: "Stopped", progress: 0 });
-        if (ev.state === "error") status.set({ message: lastError.peek()?.notWired ? "Stopped at the model boundary" : "Failed", progress: 0 });
+        if (ev.state === "error") status.set({ message: "Failed", progress: 0 });
         break;
       case "step": {
         const m = ev.metrics;
         trainX.push(m.step);
         trainY.push(m.loss);
         metrics.update((prev) => ({ ...prev, step: m.step, loss: m.loss, lr: m.lr, tps: m.tokensPerSec, msStep: m.msPerStep, eta: ev.etaMs ?? NaN, mem: ev.memBytes ?? NaN }));
-        status.set({ message: `Training · step ${m.step} / ${maxSteps.peek()}`, progress: m.step / Math.max(1, maxSteps.peek()) });
+        // A late step event (flushed after Stop) must not overwrite the "Stopped" status line.
+        if (sessionState.peek() === "running" || sessionState.peek() === "paused") {
+          status.set({ message: `Training · step ${m.step} / ${maxSteps.peek()}`, progress: m.step / Math.max(1, maxSteps.peek()) });
+        }
         scheduleChart();
         break;
       }
@@ -153,7 +156,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
     }
   }
 
-  const pasteArea = h("textarea", { class: "textarea", placeholder: "Paste any text — a few hundred KB works well for char-level models.", rows: 7 });
+  const pasteArea = h("textarea", { class: "textarea", placeholder: "Paste any text - a few hundred KB works well for char-level models.", rows: 7 });
   pasteArea.addEventListener("input", () => {
     text.set(pasteArea.value);
     textName.set("pasted text");
@@ -229,7 +232,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
   scope.effect(() => {
     const k = tokKind();
     vocabSlider.el.style.display = k === "bpe" ? "" : "none";
-    tokHint.textContent = k === "char" ? "One token per distinct character — the classic nanoGPT Shakespeare setup. Vocab comes from the text." : "GPT-2-style merges trained on your text inside the worker before training starts (a few seconds for 1 MB).";
+    tokHint.textContent = k === "char" ? "One token per distinct character - the classic nanoGPT Shakespeare setup. Vocab comes from the text." : "GPT-2-style merges trained on your text inside the worker before training starts (a few seconds for 1 MB).";
   });
   const tokenizerCard = card("Tokenizer", [h("div", { class: "stack stack--sm" }, tokSeg, vocabSlider.el, tokHint)], { class: "card--tight" });
 
@@ -261,7 +264,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
     { class: "select", onchange: () => context.set(Number(contextSel.value)) },
     ...CONTEXT_OPTIONS.map((n) => h("option", { value: String(n) }, `${n} tokens`)),
   );
-  const paramEl = h("span", { class: "param-count__n" }, "—");
+  const paramEl = h("span", { class: "param-count__n" }, "-");
   const paramSub = h("span", { class: "param-count__l" }, "parameters");
   const memHint = h("div", { class: "field__hint" });
   scope.effect(() => {
@@ -368,30 +371,15 @@ export async function mount(root: HTMLElement): Promise<() => void> {
   });
   scope.effect(() => {
     const err = lastError();
-    const ds = datasetInfo();
     errorHost.replaceChildren();
     if (!err) return;
     errorHost.style.marginTop = "12px";
-    if (err.notWired) {
-      errorHost.appendChild(
-        notice("ember", [
-          h("b", null, "Pipeline ran up to the model boundary. "),
-          ds ? `Tokenizer and dataset are built (${fmtInt(ds.tokens)} tokens, vocab ${ds.vocabSize}, ≈${fmtCompact(ds.paramCount)} params). ` : "",
-          "Training itself lands with the phase-2 engine (src/models/gpt.ts, src/train/trainer.ts) — wire ",
-          h("code", null, "createTrainer()"),
-          " in ",
-          h("code", null, "web/src/lib/engine.ts"),
-          ".",
-        ]),
-      );
-    } else {
-      errorHost.appendChild(notice("bad", [err.message]));
-    }
+    errorHost.appendChild(notice("bad", [err.message]));
   });
 
   // ------------------------------------------------------------ metric tiles
   const tStep = tile("Step");
-  const tLoss = tile("Train loss", "—", { ember: true });
+  const tLoss = tile("Train loss", "-", { ember: true });
   const tVal = tile("Val loss");
   const tLr = tile("Learning rate");
   const tTps = tile("Tokens / s");
@@ -404,10 +392,10 @@ export async function mount(root: HTMLElement): Promise<() => void> {
     tLoss.set(fmtFixed(m.loss, 4));
     tVal.set(fmtFixed(m.valLoss, 4));
     tLr.set(fmtSci(m.lr, 2));
-    tTps.set(Number.isFinite(m.tps) ? fmtCompact(m.tps, 1) : "—");
+    tTps.set(Number.isFinite(m.tps) ? fmtCompact(m.tps, 1) : "-");
     tMs.set(fmtMs(m.msStep));
-    tEta.set(Number.isFinite(m.eta) ? fmtDuration(m.eta) : "—");
-    tMem.set(Number.isFinite(m.mem) ? fmtBytes(m.mem) : "—", sessionInfo()?.device === "cpu" ? "cpu backend" : "live buffers");
+    tEta.set(Number.isFinite(m.eta) ? fmtDuration(m.eta) : "-");
+    tMem.set(Number.isFinite(m.mem) ? fmtBytes(m.mem) : "-", sessionInfo()?.device === "cpu" ? "cpu backend" : "live buffers");
   });
   const tiles = h("div", { class: "tiles" }, tStep.el, tLoss.el, tVal.el, tLr.el, tTps.el, tMs.el, tEta.el, tMem.el);
 
@@ -448,7 +436,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
   });
 
   // ------------------------------------------------------------ samples panel
-  const samplePrompt = h("input", { class: "input input--mono", placeholder: "Prompt (optional) — e.g. ROMEO:", value: "" });
+  const samplePrompt = h("input", { class: "input input--mono", placeholder: "Prompt (optional) - e.g. ROMEO:", value: "" });
   const sampleBtn = button("Sample now", {
     icon: "flame",
     size: "sm",
@@ -485,7 +473,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
         "div",
         { class: "row" },
         chip("device", info ? (info.device === "webgpu" ? "WebGPU" : "CPU") : preferGpu() === "webgpu" ? "WebGPU" : "CPU", "ember"),
-        chip("thread", info ? (info.inWorker ? "worker" : "main") : "—"),
+        chip("thread", info ? (info.inWorker ? "worker" : "main") : "-"),
         chip("preset", preset()),
         ds ? chip("tokens", fmtCompact(ds.tokens)) : null,
         ds ? chip("vocab", ds.vocabSize) : null,
@@ -496,7 +484,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
   const runCard = card("Run", [runInfo, h("div", { class: "field__hint", style: "margin-top:12px" }, "Training runs in a Web Worker so the page never stalls; it falls back to the main thread when the worker has no WebGPU. Checkpoints download as safetensors + a JSON sidecar (config, tokenizer, training log).")], { class: "card--tight" });
 
   // ------------------------------------------------------------ layout
-  root.appendChild(pageHead("Train live", "Studio", "Pick a corpus, a tokenizer and a GPT preset, then watch the loss fall on your GPU. Everything here — kernels, autograd, optimiser — is Kiln's own TypeScript.", []));
+  root.appendChild(pageHead("Train live", "Studio", "Pick a corpus, a tokenizer and a GPT preset, then watch the loss fall on your GPU. Everything here - kernels, autograd, optimiser - is Kiln's own TypeScript.", []));
   root.appendChild(
     h(
       "div",

@@ -1,4 +1,4 @@
-/** Bench — matmul GFLOPS CPU vs WebGPU, elementwise GB/s, softmax / layernorm rows/s. */
+/** Bench - matmul GFLOPS CPU vs WebGPU, elementwise GB/s, softmax / layernorm rows/s. */
 import { h } from "../lib/dom";
 import { Scope, signal } from "../lib/signals";
 import { BarChart, chartTheme } from "../lib/charts";
@@ -68,7 +68,7 @@ export async function mount(root: HTMLElement): Promise<() => void> {
     root.appendChild(
       notice("warn", [
         h("b", null, "WebGPU is unavailable in this browser"),
-        " — only the CPU backend will be measured. See the Tests page for browser guidance.",
+        " - only the CPU backend will be measured. See the Tests page for browser guidance.",
       ]),
     );
   }
@@ -131,9 +131,9 @@ export async function mount(root: HTMLElement): Promise<() => void> {
           null,
           h("td", { class: "op" }, r.kernel),
           h("td", { class: "dim" }, r.size),
-          h("td", { class: "num" }, r.cpu === null ? "—" : `${formatMetric(r.cpu, r.unit)} ${r.unit}`),
-          h("td", { class: "num", style: r.gpu !== null ? "color:var(--ember-bright)" : "" }, r.gpu === null ? "—" : `${formatMetric(r.gpu, r.unit)} ${r.unit}`),
-          h("td", { class: "num" }, speed === null ? "—" : `${speed.toFixed(1)}×`),
+          h("td", { class: "num" }, r.cpu === null ? "-" : `${formatMetric(r.cpu, r.unit)} ${r.unit}`),
+          h("td", { class: "num", style: r.gpu !== null ? "color:var(--ember-bright)" : "" }, r.gpu === null ? "-" : `${formatMetric(r.gpu, r.unit)} ${r.unit}`),
+          h("td", { class: "num" }, speed === null ? "-" : `${speed.toFixed(1)}×`),
           h("td", { class: "num dim" }, `${fmtMs(r.cpuMs)} / ${fmtMs(r.gpuMs)}`),
         );
       }),

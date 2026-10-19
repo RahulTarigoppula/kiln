@@ -1,17 +1,16 @@
 /**
- * Engine adapter — the ONLY place the web app touches the model/training layer.
+ * Engine adapter - the ONLY place the web app touches the model/training layer.
  *
- * Everything that exists in phase 1 (tokenizers, dataset, safetensors checkpoints, backends) is wired
- * for real. Calls that need the phase-2 modules (`src/nn`, `src/optim`, `src/models/gpt.ts`,
- * `src/models/io.ts`, `src/train/trainer.ts`) are isolated behind the functions marked `TODO(phase-2)`
- * below and currently throw {@link EngineNotWiredError}; the UI renders that as an inline notice.
- *
- * Planned phase-2 API this adapter targets:
- *   new GPT(config) · GPT_PRESETS.{nano,micro,mini,small} · model.forward(idx, targets?) → {logits, loss?}
- *   model.generate(idx, maxNewTokens, {temperature, topK, topP, seed, onToken}) · model.captureAttention
- *   new Trainer({...}, {onStep, onEval, onSample}) with run()/pause()/resume()/stop() · saveGPT/loadGPT
+ * Tokenizers, datasets and safetensors parsing come from `src/data` and `src/models/checkpoint`; model
+ * instantiation, generation, attention capture and training are thin wrappers over `GPT`, `saveGPT`/`loadGPT`
+ * and `Trainer` (`src/models`, `src/train`). Every forward/backward pass runs inside the engine's `tidy`
+ * scopes, so device memory stays flat across steps (see ARCHITECTURE.md § Memory management).
  */
 import type { Device } from "../../../src/backend/types";
+import { Tensor } from "../../../src/tensor/tensor";
+import { manualSeed } from "../../../src/tensor/random";
+import { tidy } from "../../../src/tensor/scope";
+import { noGrad } from "../../../src/autograd/graph";
 import {
   ByteLevelBPE,
   CharTokenizer,
@@ -27,16 +26,23 @@ import {
   type FetchedCheckpoint,
   type KilnCheckpointMeta,
   type TensorRecord,
+  type TrainingLogEntry,
 } from "../../../src/models/checkpoint";
+import { GPT, GPT_PRESETS, type GPTConfig, type GPTPreset } from "../../../src/models/gpt";
+import { loadGPTFromRecords, saveGPT } from "../../../src/models/io";
+import { configureAdamW } from "../../../src/optim/adamw";
+import { makeCosineWithWarmup } from "../../../src/optim/schedulers";
+import { Trainer } from "../../../src/train/trainer";
 
-export type { Tokenizer, TokenizerJSON, FetchedCheckpoint, KilnCheckpointMeta, TensorRecord };
+export type { Tokenizer, TokenizerJSON, FetchedCheckpoint, KilnCheckpointMeta, TensorRecord, GPTConfig };
 
-/** Set to true once the phase-2 modules are imported below. Pages use it to label scaffolded actions. */
-export const ENGINE_WIRED = false;
+/** True: the model engine is imported and every adapter function below is live. */
+export const ENGINE_WIRED = true;
 
+/** Kept for the UI's error classification; nothing throws it any more. */
 export class EngineNotWiredError extends Error {
   constructor(readonly feature: string) {
-    super(`${feature} needs the phase-2 model engine (src/models/gpt.ts, src/train/trainer.ts). The UI is ready; wire it in web/src/lib/engine.ts.`);
+    super(`${feature} is not available in this build.`);
     this.name = "EngineNotWiredError";
   }
 }
@@ -47,18 +53,7 @@ export function isEngineNotWired(err: unknown): err is EngineNotWiredError {
 
 // ---------------------------------------------------------------- model config & presets
 
-/** nanoGPT-compatible configuration (see ARCHITECTURE.md § nn / optim / models). */
-export interface GPTConfig {
-  vocabSize: number;
-  blockSize: number;
-  nLayer: number;
-  nHead: number;
-  nEmbd: number;
-  dropout: number;
-  bias: boolean;
-}
-
-export type PresetName = "nano" | "micro" | "mini" | "small";
+export type PresetName = GPTPreset;
 
 export interface Preset {
   name: PresetName;
@@ -73,18 +68,23 @@ export interface Preset {
   blurb: string;
 }
 
-/**
- * Model presets. TODO(phase-2): replace with `GPT_PRESETS` from `src/models/gpt.ts` once it lands
- * (keep the same names so Studio's picker needs no change).
- */
-export const PRESETS: Record<PresetName, Preset> = {
-  nano: { name: "nano", nLayer: 3, nHead: 3, nEmbd: 48, blockSize: 64, batchSize: 32, lr: 1e-3, maxSteps: 1500, blurb: "3 layers · d48" },
-  micro: { name: "micro", nLayer: 4, nHead: 4, nEmbd: 128, blockSize: 128, batchSize: 32, lr: 6e-4, maxSteps: 3000, blurb: "4 layers · d128" },
-  mini: { name: "mini", nLayer: 6, nHead: 6, nEmbd: 192, blockSize: 256, batchSize: 32, lr: 5e-4, maxSteps: 5000, blurb: "6 layers · d192" },
-  small: { name: "small", nLayer: 8, nHead: 8, nEmbd: 256, blockSize: 256, batchSize: 32, lr: 3e-4, maxSteps: 8000, blurb: "8 layers · d256" },
+/** UI defaults layered over the engine's size presets (`GPT_PRESETS` in src/models/gpt.ts). */
+const PRESET_UI: Record<PresetName, Pick<Preset, "blockSize" | "batchSize" | "lr" | "maxSteps">> = {
+  nano: { blockSize: 64, batchSize: 32, lr: 1e-3, maxSteps: 1500 },
+  micro: { blockSize: 128, batchSize: 32, lr: 1e-3, maxSteps: 2000 },
+  mini: { blockSize: 256, batchSize: 32, lr: 5e-4, maxSteps: 5000 },
+  small: { blockSize: 256, batchSize: 32, lr: 3e-4, maxSteps: 8000 },
 };
 
-export const PRESET_NAMES: PresetName[] = ["nano", "micro", "mini", "small"];
+export const PRESET_NAMES: PresetName[] = Object.keys(GPT_PRESETS) as PresetName[];
+
+export const PRESETS: Record<PresetName, Preset> = Object.fromEntries(
+  PRESET_NAMES.map((name) => {
+    const size = GPT_PRESETS[name];
+    const ui = PRESET_UI[name];
+    return [name, { name, ...size, ...ui, blurb: `${size.nLayer} layers · d${size.nEmbd}` } satisfies Preset];
+  }),
+) as Record<PresetName, Preset>;
 
 export function presetConfig(preset: Preset, vocabSize: number, overrides: Partial<GPTConfig> = {}): GPTConfig {
   return {
@@ -118,7 +118,7 @@ export function estimateTrainingBytes(c: GPTConfig, batchSize: number): number {
   return states + act;
 }
 
-// ---------------------------------------------------------------- tokenizers & data (live)
+// ---------------------------------------------------------------- tokenizers & data
 
 export type TokenizerKind = "char" | "bpe";
 
@@ -128,7 +128,7 @@ export interface TokenizerSpec {
   vocabSize: number;
 }
 
-/** Build a tokenizer from text (char vocab or trained byte-level BPE). Live in phase 1. */
+/** Build a tokenizer from text (char vocab or trained byte-level BPE). */
 export function buildTokenizer(spec: TokenizerSpec, text: string, onProgress?: (done: number, total: number) => void): Tokenizer {
   if (spec.kind === "char") return CharTokenizer.fromText(text);
   return ByteLevelBPE.train(text, spec.vocabSize, { onProgress });
@@ -147,7 +147,7 @@ export interface DatasetSummary {
   tokensPerChar: number;
 }
 
-/** Encode `text` and split 90/10 into train/val token datasets. Live in phase 1. */
+/** Encode `text` and split 90/10 into train/val token datasets. */
 export function buildDataset(tokenizer: Tokenizer, text: string, blockSize: number): { ids: Int32Array; train: TokenDataset; val: TokenDataset; summary: DatasetSummary } {
   const ids = tokenizer.encode(text);
   const ds = new TokenDataset(ids, blockSize);
@@ -173,7 +173,7 @@ export function quickTextStats(text: string, spec: TokenizerSpec): { chars: numb
   return { chars, charVocab: set.size, estTokens };
 }
 
-// ---------------------------------------------------------------- checkpoints (live)
+// ---------------------------------------------------------------- checkpoints
 
 export interface LoadedCheckpoint extends FetchedCheckpoint {
   /** Where it came from (URL or file name). */
@@ -212,10 +212,10 @@ function finishCheckpoint(fetched: FetchedCheckpoint, source: string): LoadedChe
 }
 
 export async function loadCheckpointFromUrl(url: string, signal?: AbortSignal): Promise<LoadedCheckpoint> {
-  // Dev servers / GitHub Pages SPA fallbacks answer missing files with index.html — treat that as 404.
+  // Dev servers / GitHub Pages SPA fallbacks answer missing files with index.html - treat that as 404.
   const probe = await fetch(url, { method: "HEAD", signal }).catch(() => null);
   if (!probe || !probe.ok || (probe.headers.get("content-type") ?? "").includes("text/html")) {
-    throw new Error(`fetchCheckpoint: ${url} → HTTP ${probe?.ok ? 404 : probe?.status ?? 404}`);
+    throw new Error(`fetchCheckpoint: ${url} -> HTTP ${probe?.ok ? 404 : probe?.status ?? 404}`);
   }
   const fetched = await fetchCheckpoint(url, { signal });
   return finishCheckpoint(fetched, url);
@@ -243,12 +243,14 @@ export function findEmbeddingRecord(ckpt: LoadedCheckpoint): TensorRecord | null
   return ckpt.records.find((r) => r.shape.length === 2) ?? null;
 }
 
-// ---------------------------------------------------------------- generation & inspection (phase-2)
+// ---------------------------------------------------------------- generation & inspection
 
 export interface GenerateOptions {
   maxNewTokens: number;
   temperature: number;
+  /** 0 = off. */
   topK: number;
+  /** ≥ 1 = off. */
   topP: number;
   seed?: number;
 }
@@ -275,39 +277,179 @@ export interface AttentionMaps {
   T: number;
 }
 
-/** Opaque handle to an instantiated model (phase-2 GPT instance). */
+/** Handle to an instantiated model. */
 export interface ModelHandle {
   readonly config: GPTConfig;
   readonly tokenizer: Tokenizer;
   readonly device: Device;
+  /** Non-embedding parameter count (nanoGPT convention). */
   readonly paramCount: number;
-  /** TODO(phase-2): the `GPT` instance. */
-  readonly impl: unknown;
+  readonly impl: GPT;
+}
+
+/** Rebuild the GPT from a parsed checkpoint on `device` (eval mode; dropout off). */
+export async function instantiateModel(ckpt: LoadedCheckpoint, device: Device): Promise<ModelHandle> {
+  if (!ckpt.meta) throw new Error("This checkpoint has no .json sidecar - the model config and tokenizer are needed to rebuild it.");
+  if (!ckpt.tokenizer) throw new Error("The sidecar has no recognisable tokenizer (expected type \"char\" or \"bpe\").");
+  const loaded = loadGPTFromRecords(ckpt.records, ckpt.meta, device);
+  loaded.model.eval();
+  if (device !== "cpu") await loaded.model.parameters()[0]?.backend.sync(); // surface GPU errors here, not mid-generation
+  return { config: loaded.config, tokenizer: ckpt.tokenizer, device, paramCount: loaded.model.numParameters(), impl: loaded.model };
+}
+
+/** Upload a flat i32 id array as a [1, T] tensor on `device`. */
+function uploadIds(ids: ArrayLike<number>, device: Device): Tensor {
+  const arr = ids.length ? Int32Array.from(ids) : Int32Array.from([0]);
+  const cpu = Tensor.fromArray(arr, [1, arr.length], { dtype: "i32", device: "cpu" });
+  const dev = cpu.to(device);
+  if (dev !== cpu) cpu.free();
+  return dev;
+}
+
+const TOP_N = 5;
+
+/** The top-N entries of a probability row. */
+function topAlternatives(probs: Float32Array, tokenizer: Tokenizer, n = TOP_N): TokenAlternative[] {
+  const best: number[] = [];
+  for (let i = 0; i < probs.length; i++) {
+    const p = probs[i] as number;
+    if (p <= 0) continue;
+    let pos = best.length;
+    while (pos > 0 && (probs[best[pos - 1] as number] as number) < p) pos--;
+    if (pos < n) {
+      best.splice(pos, 0, i);
+      if (best.length > n) best.pop();
+    }
+  }
+  return best.map((id) => ({ id, text: tokenizer.decode([id]), prob: probs[id] as number }));
+}
+
+function engineGenerateOptions(opts: GenerateOptions, vocabSize: number): { temperature: number; topK?: number; topP?: number; seed?: number } {
+  const out: { temperature: number; topK?: number; topP?: number; seed?: number } = { temperature: opts.temperature };
+  if (opts.topK > 0 && opts.topK < vocabSize) out.topK = Math.floor(opts.topK);
+  if (opts.topP > 0 && opts.topP < 1) out.topP = opts.topP;
+  if (opts.seed !== undefined) out.seed = opts.seed;
+  return out;
+}
+
+/** Yield one macrotask so the page can paint between tokens (readbacks on the CPU backend resolve immediately). */
+function nextMacrotask(): Promise<void> {
+  if (typeof MessageChannel !== "undefined") {
+    return new Promise((resolve) => {
+      const ch = new MessageChannel();
+      ch.port1.onmessage = () => {
+        ch.port1.close();
+        resolve();
+      };
+      ch.port2.postMessage(null);
+    });
+  }
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 /**
- * TODO(phase-2): `const model = loadGPT(ckpt.records, ckpt.meta)` → `model.to(device)`.
+ * Stream tokens from `model.generate`. Each `onToken` callback is turned into a {@link TokenEvent} (probability of
+ * the sampled id + the top-5 of the softmax row) and handed to the consumer; the engine waits for the consumer
+ * before computing the next token, so an abort takes effect immediately and the UI gets a paint per token.
  */
-export async function instantiateModel(_ckpt: LoadedCheckpoint, _device: Device): Promise<ModelHandle> {
-  throw new EngineNotWiredError("Model instantiation");
+async function* streamTokens(model: GPT, tokenizer: Tokenizer, promptIds: Int32Array, opts: GenerateOptions, signal?: AbortSignal): AsyncGenerator<TokenEvent> {
+  const device = model.device;
+  const wasTraining = model.training;
+  model.eval();
+  const idx = uploadIds(promptIds, device);
+  const queue: TokenEvent[] = [];
+  // Handshake between the engine's onToken (producer) and this generator (consumer).
+  const hs: { release: (() => void) | null; wake: (() => void) | null; finished: boolean } = { release: null, wake: null, finished: false };
+  const ctrl = new AbortController();
+  const onAbort = (): void => {
+    ctrl.abort();
+    hs.release?.();
+    hs.wake?.();
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
+  if (signal?.aborted) onAbort();
+  const run = model
+    .generate(idx, opts.maxNewTokens, {
+      ...engineGenerateOptions(opts, model.config.vocabSize),
+      signal: ctrl.signal,
+      onToken: (id, probs) => {
+        queue.push({ id, text: tokenizer.decode([id]), prob: probs[id] as number, top: topAlternatives(probs, tokenizer) });
+        hs.wake?.();
+        hs.wake = null;
+        return new Promise<void>((r) => {
+          hs.release = r;
+        });
+      },
+    })
+    .then((out) => out.free());
+  void run.finally(() => {
+    hs.finished = true;
+    hs.wake?.();
+    hs.wake = null;
+  });
+  try {
+    for (;;) {
+      if (!queue.length) {
+        if (hs.finished) break;
+        await new Promise<void>((r) => {
+          hs.wake = r;
+        });
+        continue;
+      }
+      const ev = queue.shift() as TokenEvent;
+      await nextMacrotask();
+      yield ev;
+      if (ctrl.signal.aborted) break;
+      const r = hs.release;
+      hs.release = null;
+      r?.();
+    }
+    await run;
+  } finally {
+    ctrl.abort();
+    hs.release?.();
+    signal?.removeEventListener("abort", onAbort);
+    await run.catch(() => undefined);
+    idx.free();
+    model.train(wasTraining);
+  }
 }
 
-/**
- * TODO(phase-2): `model.generate(idx, maxNewTokens, {temperature, topK, topP, seed, onToken})`, yielding one
- * {@link TokenEvent} per sampled token (probability of the sampled id + top-5 of the softmax row).
- */
-export async function* generateTokens(_model: ModelHandle, _promptIds: Int32Array, _opts: GenerateOptions, _signal?: AbortSignal): AsyncGenerator<TokenEvent> {
-  throw new EngineNotWiredError("Generation");
+/** Stream tokens from an instantiated model. */
+export function generateTokens(model: ModelHandle, promptIds: Int32Array, opts: GenerateOptions, signal?: AbortSignal): AsyncGenerator<TokenEvent> {
+  return streamTokens(model.impl, model.tokenizer, promptIds, opts, signal);
 }
 
-/**
- * TODO(phase-2): `model.captureAttention = true; model.forward(idx)` → read the per-layer attention weights.
- */
-export async function attentionMaps(_model: ModelHandle, _ids: Int32Array): Promise<AttentionMaps> {
-  throw new EngineNotWiredError("Attention capture");
+/** One forward pass with attention capture; returns every layer's [nHead, T, T] weights for the prompt. */
+export async function attentionMaps(model: ModelHandle, ids: Int32Array): Promise<AttentionMaps> {
+  const gpt = model.impl;
+  if (ids.length === 0) throw new Error("attentionMaps: empty prompt");
+  if (ids.length > model.config.blockSize) throw new Error(`attentionMaps: ${ids.length} tokens exceed blockSize ${model.config.blockSize}`);
+  const wasTraining = gpt.training;
+  gpt.eval();
+  gpt.captureAttention = true;
+  const idx = uploadIds(ids, gpt.device);
+  try {
+    tidy(() => noGrad(() => gpt.forward(idx).logits)).free();
+    const layers = gpt.attentionWeights();
+    const weights: Float32Array[] = [];
+    for (const t of layers) {
+      if (!t) throw new Error("attentionMaps: a layer produced no attention weights");
+      weights.push((await t.data()) as Float32Array);
+    }
+    return { weights, nLayer: model.config.nLayer, nHead: model.config.nHead, T: ids.length };
+  } finally {
+    for (const block of gpt.transformer.h.items) {
+      block.attn.lastAttention?.free();
+      block.attn.lastAttention = null;
+    }
+    gpt.captureAttention = false;
+    idx.free();
+    gpt.train(wasTraining);
+  }
 }
 
-// ---------------------------------------------------------------- training (phase-2)
+// ---------------------------------------------------------------- training
 
 export interface TrainHyper {
   batchSize: number;
@@ -336,6 +478,7 @@ export interface StepMetrics {
   step: number;
   loss: number;
   lr: number;
+  gradNorm?: number;
   tokensPerSec: number;
   msPerStep: number;
 }
@@ -363,15 +506,97 @@ export interface TrainerHandle {
   pause(): void;
   resume(): void;
   stop(): void;
-  /** Serialise the current weights + sidecar meta. */
+  /** Serialise the current weights + sidecar meta (weights only; the sidecar carries tokenizer, config and log). */
   exportCheckpoint(): Promise<{ safetensors: Uint8Array; meta: KilnCheckpointMeta }>;
   /** Sample from the in-training model. */
   generate(promptIds: Int32Array, opts: GenerateOptions, signal?: AbortSignal): AsyncGenerator<TokenEvent>;
+  /** Steps completed so far. */
+  readonly step: number;
 }
 
-/**
- * TODO(phase-2): `new Trainer({ model: new GPT(job.config).to(job.device), train, val, ...job.hyper }, callbacks)`.
- */
-export async function createTrainer(_job: TrainJob, _callbacks: TrainerCallbacks): Promise<TrainerHandle> {
-  throw new EngineNotWiredError("Training");
+/** Steps between loss readbacks on each device (the only host sync in the loop). */
+const LOSS_READBACK_INTERVAL: Record<Device, number> = { cpu: 1, webgpu: 2 };
+
+/** Thin a long per-step log for the sidecar (every entry with a valLoss is kept). */
+export function compactTrainingLog(log: TrainingLogEntry[], maxEntries = 1500): TrainingLogEntry[] {
+  const round = (e: TrainingLogEntry): TrainingLogEntry => {
+    const out: TrainingLogEntry = { step: e.step, loss: Number(e.loss.toFixed(4)) };
+    if (e.valLoss !== undefined) out.valLoss = Number(e.valLoss.toFixed(4));
+    if (e.lr !== undefined) out.lr = Number(e.lr.toPrecision(4));
+    if (e.tokensPerSec !== undefined) out.tokensPerSec = Math.round(e.tokensPerSec);
+    if (e.msPerStep !== undefined) out.msPerStep = Number(e.msPerStep.toFixed(1));
+    return out;
+  };
+  if (log.length <= maxEntries) return log.map(round);
+  const stride = Math.ceil(log.length / maxEntries);
+  return log.filter((e, i) => e.valLoss !== undefined || i % stride === 0 || i === log.length - 1).map(round);
+}
+
+/** Build a GPT + AdamW + Trainer for a Studio job. */
+export async function createTrainer(job: TrainJob, callbacks: TrainerCallbacks): Promise<TrainerHandle> {
+  const { hyper, device, config } = job;
+  manualSeed(hyper.seed);
+  const model = new GPT(config, device);
+  const optimizer = configureAdamW(model, { lr: hyper.lr, weightDecay: hyper.weightDecay, betas: [0.9, 0.95] });
+  const lrSchedule = makeCosineWithWarmup({ warmup: hyper.warmupSteps, total: hyper.maxSteps, lrMax: hyper.lr, lrMin: hyper.lr / 10 });
+  const trainer = new Trainer({
+    model,
+    optimizer,
+    train: job.train,
+    val: job.val,
+    tokenizer: job.tokenizer,
+    batchSize: hyper.batchSize,
+    maxSteps: hyper.maxSteps,
+    lrSchedule,
+    evalInterval: hyper.evalInterval,
+    evalIters: hyper.evalIters,
+    clipNorm: hyper.gradClip,
+    sampleInterval: hyper.sampleInterval,
+    sampleTokens: hyper.sampleTokens,
+    samplePrompt: "\n",
+    sampleTemperature: 0.8,
+    sampleTopK: 40,
+    device,
+    seed: hyper.seed,
+    lossReadbackInterval: LOSS_READBACK_INTERVAL[device],
+    callbacks: {
+      onStep: (s) => {
+        const m: StepMetrics = { step: s.step, loss: s.loss, lr: s.lr, tokensPerSec: s.tokensPerSec, msPerStep: s.msPerStep };
+        if (s.gradNorm !== undefined) m.gradNorm = s.gradNorm;
+        callbacks.onStep(m);
+      },
+      onEval: (e) => callbacks.onEval({ step: e.step, valLoss: e.valLoss, trainLoss: e.trainLoss }),
+      onSample: (s) => callbacks.onSample(s),
+    },
+  });
+  if (device !== "cpu") await model.parameters()[0]?.backend.sync(); // init kernels ran; surface GPU errors early
+
+  return {
+    get step() {
+      return trainer.state.step;
+    },
+    async run() {
+      await trainer.run();
+    },
+    pause: () => trainer.pause(),
+    resume: () => trainer.resume(),
+    stop: () => trainer.stop(),
+    async exportCheckpoint() {
+      const st = trainer.state;
+      const lastVal = [...st.trainingLog].reverse().find((e) => e.valLoss !== undefined)?.valLoss;
+      const { bytes, meta } = await saveGPT(model, job.tokenizer.toJSON(), compactTrainingLog(st.trainingLog), {
+        step: st.step,
+        extra: {
+          device,
+          hyper: { ...hyper },
+          finalTrainLoss: st.lastLoss,
+          finalValLoss: lastVal ?? null,
+          trainTokens: job.train.length,
+          valTokens: job.val.length,
+        },
+      });
+      return { safetensors: bytes, meta };
+    },
+    generate: (promptIds, opts, signal) => streamTokens(model, job.tokenizer, promptIds, opts, signal),
+  };
 }

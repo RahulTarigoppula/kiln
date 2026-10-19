@@ -1,4 +1,4 @@
-/** Inspect — attention heatmaps, token-embedding PCA, weight histograms for the loaded checkpoint. */
+/** Inspect - attention heatmaps, token-embedding PCA, weight histograms for the loaded checkpoint. */
 import { h } from "../lib/dom";
 import { Scope, signal } from "../lib/signals";
 import { BarChart, Heatmap, Scatter, chartTheme, histogram } from "../lib/charts";
@@ -123,7 +123,7 @@ export function mount(root: HTMLElement): () => void {
     }
     // Axis preview without weights.
     heat.setData({ values: new Float32Array(t.length * t.length), rows: t.length, cols: t.length, xLabels: t, yLabels: t, vmin: 0, vmax: 1, xTitle: "key", yTitle: "query" });
-    heatBox.setEmpty(err ? "Attention unavailable" : `${t.length} tokens`, err ? (un ? "Needs the phase-2 model engine (attentionMaps in web/src/lib/engine.ts)." : err) : "Press “Compute attention” to run a forward pass with attention capture.");
+    heatBox.setEmpty(err ? "Attention unavailable" : `${t.length} tokens`, err ? (un ?? err) : "Press 'Compute attention' to run a forward pass with attention capture.");
   });
 
   async function computeAttention(): Promise<void> {

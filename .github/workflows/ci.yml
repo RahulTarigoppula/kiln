@@ -24,5 +24,24 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run lint:text
       - run: npm test
       - run: npm run build
+
+  gpu-parity:
+    # Best effort: headless Chromium on a CI runner has no real GPU. scripts/gpu-parity.mjs launches
+    # Chromium with SwiftShader/Vulkan flags; when WebGPU still cannot initialise the script exits 0 with a
+    # notice, and a genuine parity failure must not block the pipeline either (continue-on-error).
+    name: GPU parity (headless Chromium, best effort)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:gpu

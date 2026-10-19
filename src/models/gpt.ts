@@ -87,8 +87,13 @@ export interface GenerateOptions {
   topP?: number;
   /** Sampler seed (default: drawn from the global generator). */
   seed?: number;
-  /** Called after each generated token with its id, the sampling distribution and the batch row. */
-  onToken?: (id: number, probs: Float32Array, row: number) => void;
+  /**
+   * Called after each generated token with its id, the sampling distribution and the batch row. A returned
+   * promise is awaited before the next token is computed, so a streaming consumer can apply back-pressure.
+   */
+  onToken?: (id: number, probs: Float32Array, row: number) => void | Promise<void>;
+  /** Stops generation early (after the current token); the tokens produced so far are returned. */
+  signal?: AbortSignal;
 }
 
 /** The embedding + blocks + final norm stack (`transformer.*`). */
@@ -185,6 +190,7 @@ export class GPT extends Module {
     const V = this.config.vocabSize;
     let cur = idx.device === device ? idx : idx.to(device);
     for (let i = 0; i < maxNewTokens; i++) {
+      if (opts.signal?.aborted) break;
       const T = cur.shape[1] as number;
       const seq = cur;
       const logits = noGrad(() => tidy(() => {
@@ -194,11 +200,14 @@ export class GPT extends Module {
       const data = (await logits.data()) as Float32Array;
       logits.free();
       const next = new Int32Array(B);
+      const waits: Promise<void>[] = [];
       for (let b = 0; b < B; b++) {
         const { id, probs } = sampleLogits(data.subarray(b * V, (b + 1) * V), rng, opts);
         next[b] = id;
-        opts.onToken?.(id, probs, b);
+        const r = opts.onToken?.(id, probs, b);
+        if (r) waits.push(r);
       }
+      if (waits.length) await Promise.all(waits);
       const nextCpu = Tensor.fromArray(next, [B, 1], { dtype: "i32", device: "cpu" });
       const nextT = nextCpu.to(device);
       const appended = noGrad(() => cat([cur, nextT], 1));

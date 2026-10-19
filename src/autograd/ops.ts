@@ -49,7 +49,7 @@ export function cloneRaw(t: Tensor): Tensor {
 
 const dense = contiguousRaw;
 
-/** The tensors among `derived` that are fresh copies (not one of `originals`) — owned by a backward node. */
+/** The tensors among `derived` that are fresh copies (not one of `originals`) - owned by a backward node. */
 function fresh(derived: readonly Tensor[], originals: readonly Tensor[]): Tensor[] {
   const out: Tensor[] = [];
   for (const d of derived) if (!originals.includes(d) && !out.includes(d)) out.push(d);
@@ -239,15 +239,15 @@ function compare(op: BinaryOp, a: Scalar, b: Scalar): Tensor {
   return binaryRaw(op, at, bt);
 }
 
-/** a == b → 1.0/0.0 (no gradient). */
+/** a == b -> 1.0/0.0 (no gradient). */
 export function eq(a: Scalar, b: Scalar): Tensor { return compare("eq", a, b); }
-/** a < b → 1.0/0.0. */
+/** a < b -> 1.0/0.0. */
 export function lt(a: Scalar, b: Scalar): Tensor { return compare("lt", a, b); }
-/** a > b → 1.0/0.0. */
+/** a > b -> 1.0/0.0. */
 export function gt(a: Scalar, b: Scalar): Tensor { return compare("gt", a, b); }
-/** a <= b → 1.0/0.0. */
+/** a <= b -> 1.0/0.0. */
 export function le(a: Scalar, b: Scalar): Tensor { return compare("le", a, b); }
-/** a >= b → 1.0/0.0. */
+/** a >= b -> 1.0/0.0. */
 export function ge(a: Scalar, b: Scalar): Tensor { return compare("ge", a, b); }
 
 // ============================================================================ unary
@@ -764,7 +764,7 @@ function assertIds(ids: Tensor, op: string): void {
   if (ids.dtype !== "i32") throw new Error(`${op}: indices must be an i32 tensor (got ${ids.dtype})`);
 }
 
-/** out[..., :] = table[ids[...], :] — embedding lookup. table is [V, C]; ids any shape of i32. */
+/** out[..., :] = table[ids[...], :] - embedding lookup. table is [V, C]; ids any shape of i32. */
 export function embedding(table: Tensor, ids: Tensor): Tensor {
   assertIds(ids, "embedding");
   assertDevice(table, ids, "embedding");
@@ -791,7 +791,7 @@ export function indexSelect(x: Tensor, dim: number, ids: Tensor): Tensor {
     const perm: number[] = [d];
     for (let i = 0; i < x.ndim; i++) if (i !== d) perm.push(i);
     const picked = indexSelect(permute(x, perm), 0, ids);
-    // picked: [...ids.shape, rest...] → move the ids dims back to position d.
+    // picked: [...ids.shape, rest...] -> move the ids dims back to position d.
     const k = ids.ndim;
     const inv: number[] = [];
     for (let i = 0; i < x.ndim - 1; i++) {

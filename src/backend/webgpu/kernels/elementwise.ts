@@ -9,7 +9,7 @@ import { makeBuilder, type KernelBuilder } from "./common";
 
 /**
  * Materialise a strided view (rank ≤ 6) into a contiguous buffer.
- * Uniform (words): [n, rank, offset(i32), 0, shape(8 u32), strides(8 i32)] — 20 words.
+ * Uniform (words): [n, rank, offset(i32), 0, shape(8 u32), strides(8 i32)] - 20 words.
  */
 export const COPY_STRIDED_TEMPLATE = /* wgsl */ `
 struct Params {

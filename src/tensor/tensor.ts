@@ -193,7 +193,7 @@ export class Tensor {
     return isContiguous(this.shape, this.strides);
   }
 
-  /** True when the tensor is contiguous *and* starts at element 0 of its buffer — i.e. kernels can read it directly. */
+  /** True when the tensor is contiguous *and* starts at element 0 of its buffer - i.e. kernels can read it directly. */
   get isDense(): boolean {
     return this.offset === 0 && this.isContiguous;
   }
@@ -245,7 +245,7 @@ export class Tensor {
     return this.viewAs(this.shape, this.strides, this.offset);
   }
 
-  /** Drop the accumulated gradient (its buffer is freed — the tensor owns its grad). */
+  /** Drop the accumulated gradient (its buffer is freed - the tensor owns its grad). */
   zeroGrad(): void {
     if (this.grad) this.grad.free();
     this.grad = null;
@@ -259,7 +259,7 @@ export class Tensor {
 
   // ---------------------------------------------------------------- data movement
 
-  /** Move to another device (CPU → GPU is synchronous; GPU → CPU needs `await t.cpu()`). */
+  /** Move to another device (CPU -> GPU is synchronous; GPU -> CPU needs `await t.cpu()`). */
   to(device: Device): Tensor {
     if (device === this.device) return this;
     if (this.device !== "cpu") throw new Error("Use `await t.cpu()` to move data off the GPU");

@@ -72,7 +72,7 @@ export function footer(): HTMLElement {
     h(
       "div",
       { class: "container footer__inner" },
-      h("div", null, "Kiln — a WebGPU deep-learning framework written from scratch in TypeScript. Zero runtime dependencies."),
+      h("div", null, "Kiln - a WebGPU deep-learning framework written from scratch in TypeScript. Zero runtime dependencies."),
       h(
         "div",
         { class: "row" },

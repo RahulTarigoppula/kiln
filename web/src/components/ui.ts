@@ -32,7 +32,7 @@ export interface TileHandle {
   set(value: string, sub?: string): void;
 }
 
-export function tile(label: string, value = "—", opts: { unit?: string; ember?: boolean; sub?: string } = {}): TileHandle {
+export function tile(label: string, value = "-", opts: { unit?: string; ember?: boolean; sub?: string } = {}): TileHandle {
   const valueEl = h("span", null, value);
   const subEl = h("div", { class: "tile__sub" }, opts.sub ?? "");
   if (!opts.sub) subEl.style.display = "none";

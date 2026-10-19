@@ -61,6 +61,36 @@ describe("GPT", () => {
     for (const v of batched.dataSync()) expect(v >= 0 && v < 12).toBe(true);
   });
 
+  it("generate awaits an async onToken (back-pressure) and stops early on an aborted signal", async () => {
+    manualSeed(8);
+    const gpt = new GPT(gptConfig("nano", { vocabSize: 12, blockSize: 4 }));
+    gpt.eval();
+    const prompt = ids([1, 2, 3], [1, 3]);
+    const order: string[] = [];
+    const ctrl = new AbortController();
+    const out = await gpt.generate(prompt, 10, {
+      temperature: 0,
+      signal: ctrl.signal,
+      onToken: async (id) => {
+        order.push(`token:${id}`);
+        await new Promise((r) => setTimeout(r, 1));
+        order.push("consumed");
+        if (order.filter((o) => o === "consumed").length === 4) ctrl.abort();
+      },
+    });
+    // Each token is consumed before the next one is produced, and the abort takes effect after the 4th token.
+    expect([...out.shape]).toEqual([1, 7]);
+    expect(order.length).toBe(8);
+    for (let i = 0; i < order.length; i += 2) {
+      expect(order[i]!.startsWith("token:")).toBe(true);
+      expect(order[i + 1]).toBe("consumed");
+    }
+    const pre = new AbortController();
+    pre.abort();
+    const none = await gpt.generate(prompt, 5, { signal: pre.signal });
+    expect([...none.shape]).toEqual([1, 3]);
+  });
+
   it("sampleLogits honours temperature, top-k and top-p", () => {
     const logits = Float32Array.from([0, 1, 2, 10]);
     const rng = new Random(1);
@@ -124,7 +154,7 @@ describe("GPT", () => {
     expect(secs).toBeLessThan(60);
   });
 
-  it("checkpoint save → load gives identical logits and keeps config/tokenizer/log", async () => {
+  it("checkpoint save -> load gives identical logits and keeps config/tokenizer/log", async () => {
     manualSeed(9);
     const gpt = new GPT(gptConfig("nano", { vocabSize: 20, blockSize: 6, dropout: 0.1 }));
     gpt.eval();

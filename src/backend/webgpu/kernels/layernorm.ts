@@ -7,7 +7,7 @@
  * Backward is split in three kernels:
  *  1. `layernorm_backward_x`: gradX per row (needs two row reductions).
  *  2. `layernorm_gb_partial`: per (column, row-chunk) partial sums of g·x̂ and g.
- *  3. `layernorm_gb_final`: sums the chunk partials → gradGamma / gradBeta (deterministic order).
+ *  3. `layernorm_gb_final`: sums the chunk partials -> gradGamma / gradBeta (deterministic order).
  *
  * Uniform layouts (words):
  *  forward:  [rows, cols, eps(f32), 0]

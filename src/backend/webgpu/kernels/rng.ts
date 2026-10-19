@@ -1,8 +1,8 @@
 /**
  * Counter-based RNG kernels (`rand`, `randn`, `dropoutMask`), bit-identical to the CPU backend's hash:
  *   h = splitmix32(seed ^ (i * 0x9E3779B9)),  uniform(i) = (h >>> 8) / 2^24.
- * Normal samples use Box–Muller on the pair (i & ~1, i | 1): u1 = uniform(i & ~1), u2 = uniform(i | 1);
- * even i → r·cos(2πu2), odd i → r·sin(2πu2) with r = sqrt(-2 ln(1 - u1)) (1 - u1 ∈ (0, 1], so no clamp),
+ * Normal samples use Box - Muller on the pair (i & ~1, i | 1): u1 = uniform(i & ~1), u2 = uniform(i | 1);
+ * even i -> r·cos(2πu2), odd i -> r·sin(2πu2) with r = sqrt(-2 ln(1 - u1)) (1 - u1 ∈ (0, 1], so no clamp),
  * exactly as `src/tensor/random.ts` does on the CPU.
  *
  * Uniform layout (words): [n, seed(u32), p(f32), 0].
@@ -61,13 +61,13 @@ export function splitmix32(x: number): number {
   return v >>> 0;
 }
 
-/** uniform(seed, i) in [0, 1) — same value the WGSL `kiln_uniform` produces. */
+/** uniform(seed, i) in [0, 1) - same value the WGSL `kiln_uniform` produces. */
 export function hashUniform(seed: number, i: number): number {
   const h = splitmix32(((seed >>> 0) ^ Math.imul(i >>> 0, 0x9e3779b9)) >>> 0);
   return (h >>> 8) / 16777216;
 }
 
-/** Reference normal sample for index i (Box–Muller as described above). */
+/** Reference normal sample for index i (Box - Muller as described above). */
 export function hashNormal(seed: number, i: number): number {
   const i0 = (i & ~1) >>> 0;
   const i1 = (i | 1) >>> 0;

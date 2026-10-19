@@ -4,7 +4,7 @@
  * `gather`: out[i, :] = table[ids[i], :].
  *
  * `scatter_add` (gradTable[ids[i], :] += gradOut[i, :]) cannot use f32 atomics (not in WGSL), so it is a
- * counting sort over the ids followed by a deterministic segmented sum — exact and run-to-run stable:
+ * counting sort over the ids followed by a deterministic segmented sum - exact and run-to-run stable:
  *  1. `scatter_hist`:   counts[id] += 1            (atomicAdd on u32)
  *  2. `scan_exclusive`: offsets = exclusive scan(counts), offsets[rows] = n   (single workgroup)
  *  3. `scatter_place`:  perm[offsets[id] + atomicAdd(cursor[id], 1)] = i      (arbitrary order inside a segment)

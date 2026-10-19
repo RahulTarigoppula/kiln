@@ -1,17 +1,49 @@
 {
   "name": "kiln",
   "version": "0.1.0",
-  "description": "A WebGPU deep-learning framework written from scratch in TypeScript: tensors, autograd, WGSL kernels, transformers. Train a GPT in a browser tab.",
+  "description": "Deep-learning framework written from scratch in TypeScript: tensors, reverse-mode autograd, CPU and WebGPU (WGSL) backends, GPT, AdamW and a trainer. Zero runtime dependencies; trains a GPT live in a browser tab.",
   "type": "module",
   "license": "MIT",
   "author": "Rahul Tarigoppula",
   "repository": "github:RahulTarigoppula/kiln",
   "homepage": "https://rahultarigoppula.github.io/kiln/",
+  "keywords": [
+    "webgpu",
+    "wgsl",
+    "deep-learning",
+    "machine-learning",
+    "autograd",
+    "tensor",
+    "gpt",
+    "transformer",
+    "typescript",
+    "neural-network",
+    "training",
+    "safetensors",
+    "bpe",
+    "tokenizer",
+    "browser"
+  ],
+  "files": [
+    "src",
+    "docs/ARCHITECTURE.md",
+    "docs/KERNELS.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./webgpu": "./src/backend/webgpu/register.ts",
+    "./package.json": "./package.json"
+  },
+  "types": "./src/index.ts",
+  "sideEffects": false,
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint:text": "node scripts/lint-text.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:gpu": "node scripts/gpu-parity.mjs",
@@ -19,7 +51,8 @@
     "bench": "node --import tsx scripts/bench-cpu.ts",
     "dev": "vite --config web/vite.config.ts",
     "build": "tsc -p tsconfig.json --noEmit && vite build --config web/vite.config.ts",
-    "preview": "vite preview --config web/vite.config.ts"
+    "preview": "vite preview --config web/vite.config.ts",
+    "example": "node --import tsx examples/train-gpt.ts"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

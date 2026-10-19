@@ -1,16 +1,16 @@
 /**
  * Reductions.
  *
- * - `reduce_rows`: fast path for reducing a trailing contiguous block — one workgroup per row, each lane
+ * - `reduce_rows`: fast path for reducing a trailing contiguous block - one workgroup per row, each lane
  *   strides over the columns, then a shared-memory tree reduction (deterministic order).
  * - `reduce_general`: one thread per output element iterating the reduced index space (rank ≤ 6 for
  *   both kept and reduced dims after host-side dimension merging).
- * - `argmax_rows`: row-wise argmax (first index on ties) → i32.
+ * - `argmax_rows`: row-wise argmax (first index on ties) -> i32.
  * - `sum_squares_partial`: stage 1 of the two-stage sum of squares (stage 2 reuses `reduce_rows`).
  *
  * Uniform layouts (words):
  *  rows:    [rows, cols, 0, 0]
- *  general: [outN, redN, oRank, rRank, oShape(8), oStride(8), rShape(8), rStride(8)] — 36 words
+ *  general: [outN, redN, oRank, rRank, oShape(8), oStride(8), rShape(8), rStride(8)] - 36 words
  *  argmax:  [rows, cols, 0, 0]
  *  sumsq:   [n, 0, 0, 0]
  */

@@ -28,7 +28,7 @@ export type UnaryOp =
   /** out = a ^ alpha */ | "powScalar"
   /** out = alpha ^ a is NOT supported; use exp(a*ln(alpha)) */
   /** backward helpers */ | "geluGrad" | "tanhGrad" | "sigmoidGrad" | "reluGrad"
-  /** out = clamp(a, alpha, beta) — beta passed via second scalar */ | "clamp";
+  /** out = clamp(a, alpha, beta) - beta passed via second scalar */ | "clamp";
 
 export type BinaryOp = "add" | "sub" | "mul" | "div" | "pow" | "max" | "min" | "eq" | "lt" | "gt" | "le" | "ge";
 export type ReduceOp = "sum" | "max" | "min";
@@ -57,7 +57,7 @@ export interface Backend {
   binary(op: BinaryOp, a: Buf, b: Buf, out: Buf, outShape: number[], aStrides: number[], bStrides: number[]): void;
   /** Materialise a strided view into a contiguous buffer of prod(aShape) elements. */
   copyStrided(a: Buf, aShape: number[], aStrides: number[], aOffset: number, out: Buf): void;
-  /** out[i] = cond[i] != 0 ? a[i] : b[i] (all contiguous, same n). cond is f32 or u32 0/1 — both must work. */
+  /** out[i] = cond[i] != 0 ? a[i] : b[i] (all contiguous, same n). cond is f32 or u32 0/1 - both must work. */
   where(cond: Buf, a: Buf, b: Buf, n: number, out: Buf): void;
   /** out[i] = mask[i] != 0 ? value : a[i]. */
   maskedFill(a: Buf, mask: Buf, value: number, n: number, out: Buf): void;
@@ -75,7 +75,7 @@ export interface Backend {
   // ---- reductions ----
   /** Reduce `a` of `shape` over `axes` (sorted ascending). out has the reduced shape with those axes removed. */
   reduce(op: ReduceOp, a: Buf, shape: number[], axes: number[], out: Buf): void;
-  /** Row-wise argmax for rows×cols → out (i32, rows). */
+  /** Row-wise argmax for rows×cols -> out (i32, rows). */
   argmax(a: Buf, rows: number, cols: number, out: Buf): void;
 
   // ---- fused row kernels ----
@@ -89,7 +89,7 @@ export interface Backend {
   /**
    * Fused cross-entropy over rows×cols logits with i32 targets (rows). lossOut receives per-row loss (rows f32).
    * If gradOut is given it receives d(mean loss)/d(logits) scaled by 1/rows (rows×cols f32). Targets equal to
-   * ignoreIndex contribute 0 loss and 0 grad (and are excluded from the mean denominator — pass validCount).
+   * ignoreIndex contribute 0 loss and 0 grad (and are excluded from the mean denominator - pass validCount).
    */
   crossEntropy(logits: Buf, targets: Buf, rows: number, cols: number, lossOut: Buf, gradOut?: Buf,
                ignoreIndex?: number, validCount?: number): void;
@@ -104,7 +104,7 @@ export interface Backend {
   /** In-place AdamW step (PyTorch semantics, bias-corrected) over n elements; step is 1-based. */
   adamw(param: Buf, grad: Buf, m: Buf, v: Buf, n: number, lr: number, beta1: number, beta2: number,
         eps: number, weightDecay: number, step: number): void;
-  /** Returns sum of squares of n elements into out (1 f32) — used for global-norm gradient clipping. */
+  /** Returns sum of squares of n elements into out (1 f32) - used for global-norm gradient clipping. */
   sumSquares(a: Buf, n: number, out: Buf): void;
 
   // ---- randomness ----

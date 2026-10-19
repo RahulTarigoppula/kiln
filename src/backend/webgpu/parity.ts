@@ -220,7 +220,7 @@ export async function runParity(gpu: Backend, opts: ParityOptions = {}, cpu: Bac
       const out = H.alloc(n * 4);
       await H.run("binary", `${op} same [3,5,7]`, (b, p) => b.binary(op, p(a), p(bb), p(out), shape, strides(shape), strides(shape)), [{ pair: out, n }]);
     }
-    // broadcast [4,1,6] ⊕ [1,5,1] → [4,5,6]
+    // broadcast [4,1,6] ⊕ [1,5,1] -> [4,5,6]
     {
       const outShape = [4, 5, 6];
       const a = H.upload(gen(24));
@@ -261,7 +261,7 @@ export async function runParity(gpu: Backend, opts: ParityOptions = {}, cpu: Bac
   {
     const a = H.upload(H.f32(2 * 3 * 4 * 5));
     const out = H.alloc(120 * 4);
-    await H.run("copyStrided", "permute [2,3,4,5]→[5,2,4,3]", (b, p) => b.copyStrided(p(a), [5, 2, 4, 3], [1, 60, 5, 20], 0, p(out)), [{ pair: out, n: 120 }]);
+    await H.run("copyStrided", "permute [2,3,4,5]->[5,2,4,3]", (b, p) => b.copyStrided(p(a), [5, 2, 4, 3], [1, 60, 5, 20], 0, p(out)), [{ pair: out, n: 120 }]);
   }
 
   // --------------------------------------------------------- where / fill
@@ -353,6 +353,28 @@ export async function runParity(gpu: Backend, opts: ParityOptions = {}, cpu: Bac
       const out = H.alloc(3 * 4);
       await H.run("reduce", `${op} [3,70000] axis 1`, (b, p) => b.reduce(op, p(a), shape, [1], p(out)), [{ pair: out, n: 3, threshold: DEFAULT_THR * Math.sqrt(70000) }]);
     }
+    {
+      // leading-axis reduction over many rows (bias gradients): exercises the two-stage chunked path
+      const shape = [4096, 37];
+      const a = H.upload(H.f32(4096 * 37));
+      const out = H.alloc(37 * 4);
+      await H.run("reduce", `${op} [4096,37] axis 0 (chunked)`, (b, p) => b.reduce(op, p(a), shape, [0], p(out)), [{ pair: out, n: 37, threshold: DEFAULT_THR * Math.sqrt(4096) }]);
+    }
+    {
+      // prime row count: no divisor in range, single-pass fallback
+      const shape = [1021, 5];
+      const a = H.upload(H.f32(1021 * 5));
+      const out = H.alloc(5 * 4);
+      await H.run("reduce", `${op} [1021,5] axis 0 (prime rows)`, (b, p) => b.reduce(op, p(a), shape, [0], p(out)), [{ pair: out, n: 5, threshold: DEFAULT_THR * Math.sqrt(1021) }]);
+    }
+    {
+      // leading reduction with a non-contiguous kept pair of groups
+      const shape = [600, 3, 2, 5];
+      const n = prod(shape);
+      const a = H.upload(H.f32(n));
+      const out = H.alloc(6 * 4);
+      await H.run("reduce", `${op} [600,3,2,5] axes [0,3]`, (b, p) => b.reduce(op, p(a), shape, [0, 3], p(out)), [{ pair: out, n: 6, threshold: DEFAULT_THR * Math.sqrt(3000) }]);
+    }
   }
   {
     const shape = [2, 1, 3, 1];
@@ -372,7 +394,7 @@ export async function runParity(gpu: Backend, opts: ParityOptions = {}, cpu: Bac
   {
     const rows = 5;
     const cols = 40;
-    const a = H.upload(H.intsF32(rows * cols, 0, 3)); // ties → first index
+    const a = H.upload(H.intsF32(rows * cols, 0, 3)); // ties -> first index
     const out = H.alloc(rows * 4);
     await H.run("argmax", "ties first index", (b, p) => b.argmax(p(a), rows, cols, p(out)), [{ pair: out, n: rows, dtype: "i32", threshold: 0 }]);
   }

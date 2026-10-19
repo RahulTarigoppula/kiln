@@ -1,6 +1,6 @@
 /**
  * Global-norm gradient clipping without host readbacks: the squared norms are reduced on the device
- * (`backend.sumSquares` per gradient → one small concatenation → sum) and the clip coefficient
+ * (`backend.sumSquares` per gradient -> one small concatenation -> sum) and the clip coefficient
  * `min(1, maxNorm / (norm + eps))` is applied with broadcasting ops, so the whole thing is a handful of
  * enqueued kernels on WebGPU. The returned scalar tensor holds the pre-clip norm; `await norm.item()` only
  * when you need the number.
